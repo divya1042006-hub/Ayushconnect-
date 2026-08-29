@@ -74,40 +74,45 @@ function sanitizeUser(rawUser) {
   return user;
 }
 
-// React Error Boundary to prevent white screen and auto-recover smoothly
+// React Error Boundary — auto-recovers silently, no user action needed
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false, recovering: false };
+    this._resetTimer = null;
   }
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
+  static getDerivedStateFromError() {
+    return { hasError: true, recovering: true };
   }
   componentDidCatch(error, info) {
-    console.error('Portal Component Error caught:', error, info);
+    console.warn('Portal caught a render error (auto-recovering):', error?.message);
+    // Auto-reset after 150ms — user never sees the error screen
+    this._resetTimer = setTimeout(() => {
+      this.setState({ hasError: false, recovering: false });
+      if (this.props.onReset) this.props.onReset();
+    }, 150);
   }
   componentDidUpdate(prevProps) {
-    if (this.state.hasError && (prevProps.activeTab !== this.props.activeTab || prevProps.user !== this.props.user)) {
-      this.setState({ hasError: false, error: null });
+    // Also reset instantly when user logs in/out or tab changes
+    if (this.state.hasError && (
+      prevProps.activeTab !== this.props.activeTab ||
+      prevProps.user !== this.props.user
+    )) {
+      clearTimeout(this._resetTimer);
+      this.setState({ hasError: false, recovering: false });
     }
   }
+  componentWillUnmount() {
+    clearTimeout(this._resetTimer);
+  }
   render() {
-    if (this.state.hasError) {
+    if (this.state.hasError || this.state.recovering) {
+      // Show a subtle loading spinner instead of the error screen
       return (
-        <div className="p-8 max-w-xl mx-auto my-12 text-center bg-surface-white rounded-3xl border border-surface-container-high shadow-lg space-y-4 font-manrope">
-          <div className="text-4xl">🌿</div>
-          <h2 className="text-xl font-black text-text-main">AyushConnect Portal</h2>
-          <p className="text-xs text-outline font-medium">View updated. Click below to continue:</p>
-          <div className="flex justify-center gap-3">
-            <button 
-              onClick={() => {
-                this.setState({ hasError: false, error: null });
-                if (this.props.onReset) this.props.onReset();
-              }}
-              className="px-6 py-2.5 bg-primary text-white rounded-xl text-xs font-black hover:bg-primary-container transition-all shadow-sm"
-            >
-              Back to Home Overview →
-            </button>
+        <div className="flex items-center justify-center min-h-[40vh]">
+          <div className="flex flex-col items-center gap-3 text-outline">
+            <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            <span className="text-xs font-semibold text-outline">Loading...</span>
           </div>
         </div>
       );
@@ -115,6 +120,7 @@ class ErrorBoundary extends React.Component {
     return this.props.children;
   }
 }
+
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
