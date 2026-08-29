@@ -17,6 +17,55 @@ import HelpCentreView from './components/views/HelpCentreView';
 
 import { API_BASE } from './api';
 
+// Safe user data normalizer
+function sanitizeUser(rawUser) {
+  if (!rawUser) return null;
+  const user = { ...rawUser };
+  if (typeof user.skills === 'string') {
+    try { user.skills = JSON.parse(user.skills); } catch { user.skills = []; }
+  }
+  if (!Array.isArray(user.skills)) user.skills = [];
+  
+  if (typeof user.certifications === 'string') {
+    try { user.certifications = JSON.parse(user.certifications); } catch { user.certifications = []; }
+  }
+  if (!Array.isArray(user.certifications)) user.certifications = [];
+  
+  return user;
+}
+
+// React Error Boundary to prevent white screen of death
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error, info) {
+    console.error('Portal Component Error caught:', error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 max-w-xl mx-auto my-12 text-center bg-surface-white rounded-3xl border border-surface-container-high shadow-lg space-y-4 font-manrope">
+          <div className="text-4xl">🌿</div>
+          <h2 className="text-xl font-black text-text-main">Dashboard Refresh Required</h2>
+          <p className="text-xs text-outline font-medium">Session initialized. Click below to continue:</p>
+          <button 
+            onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
+            className="px-6 py-2.5 bg-primary text-white rounded-xl text-xs font-black hover:bg-primary-container transition-all shadow-sm"
+          >
+            Continue to Portal →
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [activeRole, setActiveRole] = useState(() => {
@@ -25,7 +74,7 @@ export default function App() {
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem('ayush_user');
-      return saved ? JSON.parse(saved) : null;
+      return saved ? sanitizeUser(JSON.parse(saved)) : null;
     } catch {
       return null;
     }
@@ -50,10 +99,12 @@ export default function App() {
   };
 
   const handleLoginSuccess = (loggedInUser, role) => {
-    setUser(loggedInUser);
+    const cleanUser = sanitizeUser(loggedInUser);
+    setUser(cleanUser);
     setActiveRole(role);
+    setIsAuthModalOpen(false);
     try {
-      localStorage.setItem('ayush_user', JSON.stringify(loggedInUser));
+      localStorage.setItem('ayush_user', JSON.stringify(cleanUser));
       localStorage.setItem('ayush_role', role);
     } catch (e) {
       console.error(e);
@@ -119,82 +170,84 @@ export default function App() {
           isSidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[260px]'
         } w-full max-w-[1440px] px-6 sm:px-10 lg:px-12 py-8 md:py-12`}
       >
-        {!user ? (
-          /* ── MANDATORY AUTHENTICATION GATE SCREEN ── */
-          <div className="max-w-3xl mx-auto my-6 p-8 md:p-12 rounded-3xl bg-surface-white border border-surface-container-high shadow-xl text-center space-y-8 animate-in fade-in zoom-in-95 duration-300">
-            <div className="inline-flex p-4 rounded-3xl bg-leaf-green-light/70 border border-leaf-green-accent/40 text-primary mb-2">
-              <Lock className="w-10 h-10 text-primary" />
-            </div>
-
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-leaf-green-light text-primary text-xs font-black tracking-wider uppercase">
-                <ShieldCheck className="w-4 h-4 text-leaf-green-accent" />
-                Ministry of Ayush • HSSC Verified Portal
+        <ErrorBoundary>
+          {!user ? (
+            /* ── MANDATORY AUTHENTICATION GATE SCREEN ── */
+            <div className="max-w-3xl mx-auto my-6 p-8 md:p-12 rounded-3xl bg-surface-white border border-surface-container-high shadow-xl text-center space-y-8 animate-in fade-in zoom-in-95 duration-300">
+              <div className="inline-flex p-4 rounded-3xl bg-leaf-green-light/70 border border-leaf-green-accent/40 text-primary mb-2">
+                <Lock className="w-10 h-10 text-primary" />
               </div>
-              <h2 className="text-2xl md:text-4xl font-extrabold text-text-main tracking-tight font-cabinet">
-                Authentication Required
-              </h2>
-              <p className="text-sm md:text-base text-outline font-medium max-w-xl mx-auto">
-                Welcome to <strong>AyushConnect</strong>. Please sign in with your role, Google Gmail account, or LinkedIn profile to access the portal dashboards, career mapping, and collaboration pipelines.
-              </p>
-            </div>
 
-            {/* Quick 4 Persona Sign In Buttons */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-w-xl mx-auto text-left">
-              {[
-                { id: 'student', title: 'Student & Intern Portal', desc: 'BAMS, BHMS, BNYS Skill Tracking', icon: GraduationCap, color: 'hover:border-primary border-surface-container-high hover:bg-leaf-green-light/30' },
-                { id: 'recruiter', title: 'Industry & Hospital Recruiter', desc: 'Ayush Hospitals & Pharma Hiring', icon: Briefcase, color: 'hover:border-tertiary border-surface-container-high hover:bg-corporate-blue-pale/40' },
-                { id: 'faculty', title: 'Faculty & Research Space', desc: 'FDPs, Research & Kshara Sutra Hub', icon: UserCheck, color: 'hover:border-purple-500 border-surface-container-high hover:bg-purple-50' },
-                { id: 'institution', title: 'Ayush College / NCISM Admin', desc: 'Accreditation, NAAC & Compliance', icon: Building2, color: 'hover:border-amber-600 border-surface-container-high hover:bg-amber-50' }
-              ].map(item => {
-                const ItemIcon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleOpenAuth(item.id)}
-                    className={`p-4 rounded-2xl border-2 transition-all flex items-start gap-3.5 bg-surface-white shadow-xs group ${item.color}`}
-                  >
-                    <div className="p-2.5 rounded-xl bg-surface-container-low text-text-main group-hover:scale-110 transition-transform shrink-0">
-                      <ItemIcon className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-black text-text-main flex items-center justify-between">
-                        <span className="truncate">{item.title}</span>
-                        <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-leaf-green-light text-primary text-xs font-black tracking-wider uppercase">
+                  <ShieldCheck className="w-4 h-4 text-leaf-green-accent" />
+                  Ministry of Ayush • HSSC Verified Portal
+                </div>
+                <h2 className="text-2xl md:text-4xl font-extrabold text-text-main tracking-tight font-cabinet">
+                  Authentication Required
+                </h2>
+                <p className="text-sm md:text-base text-outline font-medium max-w-xl mx-auto">
+                  Welcome to <strong>AyushConnect</strong>. Please sign in with your role, Google Gmail account, or LinkedIn profile to access the portal dashboards, career mapping, and collaboration pipelines.
+                </p>
+              </div>
+
+              {/* Quick 4 Persona Sign In Buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-w-xl mx-auto text-left">
+                {[
+                  { id: 'student', title: 'Student & Intern Portal', desc: 'BAMS, BHMS, BNYS Skill Tracking', icon: GraduationCap, color: 'hover:border-primary border-surface-container-high hover:bg-leaf-green-light/30' },
+                  { id: 'recruiter', title: 'Industry & Hospital Recruiter', desc: 'Ayush Hospitals & Pharma Hiring', icon: Briefcase, color: 'hover:border-tertiary border-surface-container-high hover:bg-corporate-blue-pale/40' },
+                  { id: 'faculty', title: 'Faculty & Research Space', desc: 'FDPs, Research & Kshara Sutra Hub', icon: UserCheck, color: 'hover:border-purple-500 border-surface-container-high hover:bg-purple-50' },
+                  { id: 'institution', title: 'Ayush College / NCISM Admin', desc: 'Accreditation, NAAC & Compliance', icon: Building2, color: 'hover:border-amber-600 border-surface-container-high hover:bg-amber-50' }
+                ].map(item => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleOpenAuth(item.id)}
+                      className={`p-4 rounded-2xl border-2 transition-all flex items-start gap-3.5 bg-surface-white shadow-xs group ${item.color}`}
+                    >
+                      <div className="p-2.5 rounded-xl bg-surface-container-low text-text-main group-hover:scale-110 transition-transform shrink-0">
+                        <ItemIcon className="w-5 h-5 text-primary" />
                       </div>
-                      <div className="text-[11px] text-outline truncate mt-0.5">{item.desc}</div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-black text-text-main flex items-center justify-between">
+                          <span className="truncate">{item.title}</span>
+                          <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-primary" />
+                        </div>
+                        <div className="text-[11px] text-outline truncate mt-0.5">{item.desc}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
 
-            <div className="pt-2">
-              <button
-                onClick={() => handleOpenAuth('student')}
-                className="px-8 py-3.5 rounded-2xl bg-primary text-white text-xs font-black hover:bg-primary-container shadow-md transition-all inline-flex items-center gap-2"
-              >
-                <LogIn className="w-4 h-4 text-leaf-green-accent" />
-                <span>Open Sign In / Registration Modal</span>
-              </button>
+              <div className="pt-2">
+                <button
+                  onClick={() => handleOpenAuth('student')}
+                  className="px-8 py-3.5 rounded-2xl bg-primary text-white text-xs font-black hover:bg-primary-container shadow-md transition-all inline-flex items-center gap-2"
+                >
+                  <LogIn className="w-4 h-4 text-leaf-green-accent" />
+                  <span>Open Sign In / Registration Modal</span>
+                </button>
+              </div>
             </div>
-          </div>
-        ) : (
-          /* ── LOGGED IN PORTAL TABS ── */
-          <>
-            {activeTab === 'home' && <HomeView setActiveTab={setActiveTab} setActiveRole={setActiveRole} />}
-            {activeTab === 'student' && <StudentDashboardView user={user} setActiveTab={setActiveTab} />}
-            {activeTab === 'roadmap' && <StudentRoadmapView user={user} setUser={setUser} />}
-            {activeTab === 'recommendations' && <SmartRecommendationsView user={user} />}
-            {activeTab === 'placement' && <PlacementManagementView />}
-            {activeTab === 'recruiter' && <RecruiterDashboardView setActiveTab={setActiveTab} />}
-            {activeTab === 'screening' && <ResumeScreeningView />}
-            {activeTab === 'collaboration' && <CollaborationAnalyticsView />}
-            {activeTab === 'faculty' && <FacultyDashboardView />}
-            {activeTab === 'institution' && <InstitutionDashboardView />}
-            {activeTab === 'help' && <HelpCentreView />}
-          </>
-        )}
+          ) : (
+            /* ── LOGGED IN PORTAL TABS ── */
+            <>
+              {activeTab === 'home' && <HomeView setActiveTab={setActiveTab} setActiveRole={setActiveRole} />}
+              {activeTab === 'student' && <StudentDashboardView user={user} setActiveTab={setActiveTab} />}
+              {activeTab === 'roadmap' && <StudentRoadmapView user={user} setUser={setUser} />}
+              {activeTab === 'recommendations' && <SmartRecommendationsView user={user} />}
+              {activeTab === 'placement' && <PlacementManagementView />}
+              {activeTab === 'recruiter' && <RecruiterDashboardView setActiveTab={setActiveTab} />}
+              {activeTab === 'screening' && <ResumeScreeningView />}
+              {activeTab === 'collaboration' && <CollaborationAnalyticsView />}
+              {activeTab === 'faculty' && <FacultyDashboardView />}
+              {activeTab === 'institution' && <InstitutionDashboardView />}
+              {activeTab === 'help' && <HelpCentreView />}
+            </>
+          )}
+        </ErrorBoundary>
       </main>
 
       {/* Role-Based Authentication & Signup Modal */}

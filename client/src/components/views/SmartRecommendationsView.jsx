@@ -207,7 +207,12 @@ export default function SmartRecommendationsView({ user }) {
   };
 
   // ── AI Engine: derive skill gaps from user profile ──────────────────────
-  const studentSkills = user?.skills || [
+  const rawSkills = user?.skills;
+  const parsedSkills = Array.isArray(rawSkills) 
+    ? rawSkills 
+    : (typeof rawSkills === 'string' ? (() => { try { const p = JSON.parse(rawSkills); return Array.isArray(p) ? p : null; } catch { return null; } })() : null);
+
+  const studentSkills = parsedSkills || [
     { name: 'Panchakarma Procedure Execution', score: 55, target: 90, status: 'gap' },
     { name: 'Abhyanga & Swedana', score: 78, target: 90, status: 'developing' },
     { name: 'Patient Vital Signs Monitoring', score: 88, target: 90, status: 'strong' },
@@ -215,8 +220,8 @@ export default function SmartRecommendationsView({ user }) {
     { name: 'Sterilization & Aseptic Technique', score: 45, target: 90, status: 'gap' },
   ];
 
-  const gapSkills = studentSkills.filter(s => s.status === 'gap').map(s => s.name);
-  const developingSkills = studentSkills.filter(s => s.status === 'developing').map(s => s.name);
+  const gapSkills = studentSkills.filter(s => s && s.status === 'gap').map(s => s.name);
+  const developingSkills = studentSkills.filter(s => s && s.status === 'developing').map(s => s.name);
   const allWeakSkills = [...gapSkills, ...developingSkills];
 
   // AI-ranked courses: courses that fix gaps rank highest

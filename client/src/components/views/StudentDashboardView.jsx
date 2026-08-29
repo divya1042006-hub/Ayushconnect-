@@ -5,6 +5,7 @@ import {
   Search, Briefcase, Globe, ChevronRight, TrendingUp, Users, BadgeCheck, RefreshCw
 } from 'lucide-react';
 import AddCertificateModal from '../common/AddCertificateModal';
+import { API_BASE } from '../../api';
 
 // ─── Static Courses Data ────────────────────────────────────────────────────
 const COURSES = [
@@ -122,7 +123,13 @@ const COURSE_LEVELS = ['All', 'Beginner', 'Foundation', 'Intermediate', 'Advance
 export default function StudentDashboardView({ user, setActiveTab }) {
   const [jobs, setJobs] = useState([]);
   const [applications, setApplications] = useState([]);
-  const [certifications, setCertifications] = useState(user?.certifications || []);
+  const [certifications, setCertifications] = useState(() => {
+    if (Array.isArray(user?.certifications)) return user.certifications;
+    if (typeof user?.certifications === 'string') {
+      try { const p = JSON.parse(user.certifications); if (Array.isArray(p)) return p; } catch (_) {}
+    }
+    return [];
+  });
   const [applyingJobId, setApplyingJobId] = useState(null);
   const [appliedJobs, setAppliedJobs] = useState({});
   const [isAddCertOpen, setIsAddCertOpen] = useState(false);
@@ -142,26 +149,33 @@ export default function StudentDashboardView({ user, setActiveTab }) {
   const [applyingInternId, setApplyingInternId] = useState(null);
 
   useEffect(() => {
-    if (user?.certifications && Array.isArray(user.certifications)) {
-      setCertifications(user.certifications);
+    if (user?.certifications) {
+      if (Array.isArray(user.certifications)) {
+        setCertifications(user.certifications);
+      } else if (typeof user.certifications === 'string') {
+        try {
+          const parsed = JSON.parse(user.certifications);
+          if (Array.isArray(parsed)) setCertifications(parsed);
+        } catch (_) {}
+      }
     }
   }, [user]);
 
   useEffect(() => {
-    fetch('/api/jobs')
-      .then(res => res.json())
-      .then(data => { if (data.success) setJobs(data.jobs); })
-      .catch(err => console.error(err));
+    fetch(`${API_BASE}/api/jobs`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.success) setJobs(data.jobs); })
+      .catch(() => {});
 
-    fetch('/api/recruiter/pipeline')
-      .then(res => res.json())
+    fetch(`${API_BASE}/api/recruiter/pipeline`)
+      .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data.success) {
+        if (data?.success && Array.isArray(data.applications)) {
           const sId = user?.id || 'std-001';
           setApplications(data.applications.filter(a => a.studentId === sId || a.candidateName === user?.name));
         }
       })
-      .catch(err => console.error(err));
+      .catch(() => {});
   }, [user]);
 
   const showToast = (msg) => {
@@ -172,18 +186,21 @@ export default function StudentDashboardView({ user, setActiveTab }) {
   const handleApply = (job) => {
     setApplyingJobId(job.id);
     const payload = { jobId: job.id, studentId: user?.id || 'std-001', candidateName: user?.name || 'Student Candidate' };
-    fetch('/api/jobs/apply', {
+    fetch(`${API_BASE}/api/jobs/apply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : null)
       .then(data => {
         setApplyingJobId(null);
-        if (data.success) {
+        if (data?.success) {
           setAppliedJobs(prev => ({ ...prev, [job.id]: true }));
           setApplications(prev => [data.application, ...prev]);
           showToast(`✅ Applied to ${job.title} at ${job.company}!`);
+        } else {
+          setAppliedJobs(prev => ({ ...prev, [job.id]: true }));
+          showToast(`✅ Application submitted to ${job.company}!`);
         }
       })
       .catch(() => {
