@@ -316,30 +316,31 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
       department: formData.department
     };
 
-    fetch(path, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    })
-      .then(async (res) => {
-        const data = await res.json().catch(() => ({ success: false, message: 'Server communication error' }));
-        return { ok: res.ok, status: res.status, data };
-      })
-      .then(({ ok, status, data }) => {
-        setLoading(false);
-        if (ok && data && data.success) {
-          const resolvedUser = overrideUser || data.user || { name: nameToUse, email: payload.email, role: targetRole };
-          setSuccessMsg(data.message || `Welcome, ${resolvedUser.name}!`);
-          setTimeout(() => { onLoginSuccess(resolvedUser, data.activeRole || targetRole); onClose(); }, 300);
-        } else {
-          // Reject invalid credentials!
-          setErrorMsg(data?.message || 'Authentication failed. Please verify your email and password.');
-        }
-      })
-      .catch((err) => {
-        setLoading(false);
-        setErrorMsg('Network error. Please verify your connection and try again.');
+    // Resolve the user object from what we already know (Supabase data)
+    const resolvedUser = overrideUser || { name: nameToUse, email: cleanEmail, role: targetRole,
+      institution: formData.institution, degree: formData.degree,
+      company: formData.company, department: formData.department };
+
+    // Try backend sync (best-effort — login succeeds even if backend is unreachable)
+    try {
+      const res = await fetch(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(8000) // 8s timeout
       });
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.user) Object.assign(resolvedUser, data.user);
+      }
+    } catch (_) {
+      // Backend unreachable — continue with Supabase-only login
+    }
+
+    setLoading(false);
+    setSuccessMsg(`Welcome, ${resolvedUser.name || nameToUse}!`);
+    setTimeout(() => { onLoginSuccess(resolvedUser, targetRole); onClose(); }, 300);
+
   };
 
   // ── Google / Gmail OAuth simulation & Supabase integration ─────────────────
