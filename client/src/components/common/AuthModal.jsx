@@ -339,7 +339,8 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
 
     setLoading(false);
     setSuccessMsg(`Welcome, ${resolvedUser.name || nameToUse}!`);
-    setTimeout(() => { onLoginSuccess(resolvedUser, targetRole); onClose(); }, 300);
+    onLoginSuccess(resolvedUser, targetRole);
+    onClose();
 
   };
 
@@ -365,12 +366,9 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
     setErrorMsg('');
 
     try {
-      // Step 1: Simulate Google OAuth popup
-      await new Promise(r => setTimeout(r, 450));
+      // Fast OAuth simulation
+      await new Promise(r => setTimeout(r, 150));
       setGoogleStep('syncing');
-
-      // Step 2: Simulate Google Account Profile Sync
-      await new Promise(r => setTimeout(r, 550));
 
       const baseProfile = GOOGLE_PROFILES[activeRoleTab];
       const emailToUse = (customProfile?.email || customGoogleForm.email.trim() || baseProfile.email).trim().toLowerCase();
@@ -409,7 +407,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
         certifications: certsArr,
       };
 
-      // Save / Upsert to Supabase
+      // Save / Upsert to Supabase in background
       supabase.from('users').upsert([{
         ...googleUser,
         skills: JSON.stringify(skillsArr),
@@ -420,12 +418,11 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
       setGoogleStep('done');
       setGoogleLoading(false);
       setActiveSocialPicker(null);
-      setSuccessMsg(`✅ Google account connected! Welcome, ${googleUser.name} (${googleUser.email})`);
+      setSuccessMsg(`✅ Welcome, ${googleUser.name}!`);
 
-      setTimeout(() => {
-        onLoginSuccess(googleUser, activeRoleTab);
-        onClose();
-      }, 800);
+      // Instant transition
+      onLoginSuccess(googleUser, activeRoleTab);
+      onClose();
 
     } catch (err) {
       console.warn('Google login error:', err);
@@ -442,12 +439,9 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
     setErrorMsg('');
 
     try {
-      // Step 1: Simulate opening LinkedIn OAuth popup
-      await new Promise(r => setTimeout(r, 450));
+      // Fast OAuth simulation
+      await new Promise(r => setTimeout(r, 150));
       setLinkedInStep('importing');
-
-      // Step 2: Simulate profile import
-      await new Promise(r => setTimeout(r, 550));
 
       const baseProfile = LINKEDIN_PROFILES[activeRoleTab];
       const emailToUse = (customProfile?.email || customLinkedInForm.email.trim() || baseProfile.email).trim().toLowerCase();
@@ -484,7 +478,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
         level: 4
       };
 
-      // Save / Upsert to Supabase
+      // Save / Upsert to Supabase in background
       supabase.from('users').upsert([{
         ...linkedInUser,
         skills: JSON.stringify(skillsArr),
@@ -495,12 +489,11 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
       setLinkedInStep('done');
       setLinkedInLoading(false);
       setActiveSocialPicker(null);
-      setSuccessMsg(`✅ LinkedIn connected! Welcome, ${linkedInUser.name} (${linkedInUser.email})`);
+      setSuccessMsg(`✅ Welcome, ${linkedInUser.name}!`);
 
-      setTimeout(() => {
-        onLoginSuccess(linkedInUser, activeRoleTab);
-        onClose();
-      }, 800);
+      // Instant transition
+      onLoginSuccess(linkedInUser, activeRoleTab);
+      onClose();
 
     } catch (err) {
       console.warn('LinkedIn login error:', err);
