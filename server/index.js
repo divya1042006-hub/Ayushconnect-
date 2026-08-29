@@ -5,15 +5,8 @@ import apiRouter from './routes/api.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Allow requests from the Vercel frontend (set ALLOWED_ORIGIN in Render env vars)
-const allowedOrigins = process.env.ALLOWED_ORIGIN
-  ? [process.env.ALLOWED_ORIGIN, 'http://localhost:3000']
-  : true; // Allow all origins in dev / before ALLOWED_ORIGIN is set
-
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-}));
+// Allow all origins (open CORS for demo/hackathon deployment)
+app.use(cors());
 app.use(express.json());
 
 // Root route — friendly status page
