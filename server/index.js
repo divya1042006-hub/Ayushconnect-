@@ -5,7 +5,15 @@ import apiRouter from './routes/api.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(cors());
+// Allow requests from the Vercel frontend (set ALLOWED_ORIGIN in Render env vars)
+const allowedOrigins = process.env.ALLOWED_ORIGIN
+  ? [process.env.ALLOWED_ORIGIN, 'http://localhost:3000']
+  : ['http://localhost:3000'];
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
 app.use(express.json());
 
 // API Router
