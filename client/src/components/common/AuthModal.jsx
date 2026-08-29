@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, GraduationCap, Briefcase, UserCheck, Building2, Lock, Mail, User, ShieldCheck, Sparkles, LogIn, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
+import { API_BASE } from '../../api';
 
 // Google multicolor brand SVG icon
 function GoogleIcon({ className }) {
@@ -214,7 +215,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
     setErrorMsg('');
 
     const targetRole = roleToAuth || activeRoleTab;
-    const path = isRegisterMode ? '/api/auth/register' : '/api/auth/login';
+    const path = isRegisterMode ? `${API_BASE}/api/auth/register` : `${API_BASE}/api/auth/login`;
     const cleanEmail = (userEmail || formData.email || currentConfig.defaultEmail).trim().toLowerCase();
     const cleanPassword = (formData.password || 'password123').trim();
     const nameToUse = overrideUser?.name || formData.name.trim() || cleanEmail.split('@')[0].replace(/[._]/g, ' ');
