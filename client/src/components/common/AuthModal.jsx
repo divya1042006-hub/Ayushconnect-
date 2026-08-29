@@ -349,66 +349,75 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
     setGoogleStep('authorizing');
     setErrorMsg('');
 
-    // Step 1: Simulate Google OAuth popup (400ms)
-    await new Promise(r => setTimeout(r, 400));
-    setGoogleStep('syncing');
+    try {
+      // Step 1: Simulate Google OAuth popup (400ms)
+      await new Promise(r => setTimeout(r, 400));
+      setGoogleStep('syncing');
 
-    // Step 2: Simulate Google Account Profile Sync (500ms)
-    await new Promise(r => setTimeout(r, 500));
+      // Step 2: Simulate Google Account Profile Sync (500ms)
+      await new Promise(r => setTimeout(r, 500));
 
-    const baseProfile = GOOGLE_PROFILES[activeRoleTab];
-    const emailToUse = overrideEmail || (customGmail.trim() ? customGmail.trim() : baseProfile.email);
-    const nameToUse = overrideEmail ? overrideEmail.split('@')[0].replace(/[._]/g, ' ') : (customGmail.trim() ? customGmail.split('@')[0].replace(/[._]/g, ' ') : baseProfile.name);
+      const baseProfile = GOOGLE_PROFILES[activeRoleTab];
+      const emailToUse = overrideEmail || (customGmail.trim() ? customGmail.trim() : baseProfile.email);
+      const nameToUse = overrideEmail
+        ? overrideEmail.split('@')[0].replace(/[._]/g, ' ')
+        : (customGmail.trim() ? customGmail.split('@')[0].replace(/[._]/g, ' ') : baseProfile.name);
 
-    const googleUser = {
-      id: `goog-${Date.now()}`,
-      name: nameToUse,
-      email: emailToUse,
-      role: activeRoleTab,
-      institution: baseProfile.institution || 'National Institute of Ayurveda (NIA), Jaipur',
-      degree: baseProfile.degree || 'BAMS 4th Year',
-      company: baseProfile.company || 'Ayush Wellness Center',
-      department: baseProfile.department || 'Dept of Shalya Tantra',
-      googleVerified: true,
-      provider: 'google',
-      avatarUrl: baseProfile.avatarUrl,
-      xp: activeRoleTab === 'student' ? 1480 : 600,
-      level: 4,
-      readiness_score: 82,
-      skills: JSON.stringify([
+      const skillsArr = [
         { name: "Abhyanga & Swedana Technique", score: 88, target: 90, status: "strong" },
         { name: "Sterilization & Herbal Dravya Prep", score: 92, target: 90, status: "strong" },
         { name: "Patient Vitals & Therapy Logging", score: 85, target: 85, status: "strong" },
         { name: "Kati/Janu Basti Setup & Monitoring", score: 80, target: 85, status: "developing" },
         { name: "Ayurvedic Pharmacology Basics", score: 75, target: 80, status: "developing" }
-      ]),
-      certifications: JSON.stringify([
+      ];
+      const certsArr = [
         { title: "Google Verified Ayush Practitioner", issuer: "Google Workspace & Ayush Sub-SSC", year: 2026, verified: true },
         { title: "HSSC Panchakarma Attendant Certificate", issuer: "HSSC Ayush Sub-SSC", year: 2025, verified: true }
-      ])
-    };
+      ];
 
-    // Save to Supabase public.users
-    try {
-      await supabase.from('users').upsert([googleUser]);
-    } catch (e) {
-      console.warn("Supabase Google login sync note:", e);
-    }
+      const googleUser = {
+        name: nameToUse,
+        email: emailToUse,
+        role: activeRoleTab,
+        institution: baseProfile.institution || 'National Institute of Ayurveda (NIA), Jaipur',
+        degree: baseProfile.degree || 'BAMS 4th Year',
+        company: baseProfile.company || 'Ayush Wellness Center',
+        department: baseProfile.department || 'Dept of Shalya Tantra',
+        googleVerified: true,
+        provider: 'google',
+        avatarUrl: baseProfile.avatarUrl,
+        xp: activeRoleTab === 'student' ? 1480 : 600,
+        level: 4,
+        readinessScore: 82,
+        skills: skillsArr,
+        certifications: certsArr,
+      };
 
-    setGoogleStep('done');
-    setGoogleLoading(false);
-    setShowCustomGooglePrompt(false);
-    setSuccessMsg(`✅ Google account connected! Welcome, ${googleUser.name}`);
-
-    setTimeout(() => {
-      onLoginSuccess({
+      // Background Supabase sync — non-blocking, never blocks login
+      supabase.from('users').upsert([{
         ...googleUser,
-        readinessScore: googleUser.readiness_score,
-        skills: JSON.parse(googleUser.skills),
-        certifications: JSON.parse(googleUser.certifications)
-      }, activeRoleTab);
-      onClose();
-    }, 900);
+        id: `goog-${Date.now()}`,
+        skills: JSON.stringify(skillsArr),
+        certifications: JSON.stringify(certsArr),
+        readiness_score: 82,
+      }]).catch(() => {});
+
+      setGoogleStep('done');
+      setGoogleLoading(false);
+      setShowCustomGooglePrompt(false);
+      setSuccessMsg(`✅ Google account connected! Welcome, ${googleUser.name}`);
+
+      setTimeout(() => {
+        onLoginSuccess(googleUser, activeRoleTab);
+        onClose();
+      }, 900);
+
+    } catch (err) {
+      console.warn('Google login error:', err);
+      setGoogleLoading(false);
+      setGoogleStep(null);
+      setErrorMsg('Google login failed. Please try again.');
+    }
   };
 
   // ── LinkedIn OAuth simulation ──────────────────────────────────────────────
