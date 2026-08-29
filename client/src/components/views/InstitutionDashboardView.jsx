@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, BarChart3, TrendingUp, AlertTriangle, ShieldCheck, CheckCircle2, Award, Users, BookOpen } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { API_BASE } from '../../api';
 
 export default function InstitutionDashboardView() {
   const [metrics, setMetrics] = useState(null);
 
   useEffect(() => {
-    fetch('/api/institution/analytics')
-      .then(res => res.json())
+    fetch(`${API_BASE}/api/institution/analytics`)
+      .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data.success) setMetrics(data.analytics);
-      });
+        if (data?.success) setMetrics(data.analytics);
+      })
+      .catch(() => {});
   }, []);
 
   const skillGapData = [

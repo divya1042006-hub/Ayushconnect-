@@ -122,14 +122,25 @@ const COURSE_LEVELS = ['All', 'Beginner', 'Foundation', 'Intermediate', 'Advance
 
 export default function StudentDashboardView({ user, setActiveTab }) {
   const [jobs, setJobs] = useState([]);
-  const [applications, setApplications] = useState([]);
-  const [certifications, setCertifications] = useState(() => {
-    if (Array.isArray(user?.certifications)) return user.certifications;
-    if (typeof user?.certifications === 'string') {
-      try { const p = JSON.parse(user.certifications); if (Array.isArray(p)) return p; } catch (_) {}
+  const normalizeCerts = (rawCerts) => {
+    if (!rawCerts) return [];
+    let list = rawCerts;
+    if (typeof rawCerts === 'string') {
+      try { list = JSON.parse(rawCerts); } catch (_) { list = []; }
     }
-    return [];
-  });
+    if (!Array.isArray(list)) return [];
+    return list.map(c => {
+      if (typeof c === 'string') return { title: c, issuer: 'HSSC Ayush Sub-SSC', year: 2025, verified: true };
+      return {
+        title: c?.title || 'HSSC NOS Certified Specialist',
+        issuer: c?.issuer || 'HSSC Ayush Sub-SSC',
+        year: c?.year || 2025,
+        verified: c?.verified !== false
+      };
+    });
+  };
+
+  const [certifications, setCertifications] = useState(() => normalizeCerts(user?.certifications));
   const [applyingJobId, setApplyingJobId] = useState(null);
   const [appliedJobs, setAppliedJobs] = useState({});
   const [isAddCertOpen, setIsAddCertOpen] = useState(false);
@@ -149,16 +160,7 @@ export default function StudentDashboardView({ user, setActiveTab }) {
   const [applyingInternId, setApplyingInternId] = useState(null);
 
   useEffect(() => {
-    if (user?.certifications) {
-      if (Array.isArray(user.certifications)) {
-        setCertifications(user.certifications);
-      } else if (typeof user.certifications === 'string') {
-        try {
-          const parsed = JSON.parse(user.certifications);
-          if (Array.isArray(parsed)) setCertifications(parsed);
-        } catch (_) {}
-      }
-    }
+    setCertifications(normalizeCerts(user?.certifications));
   }, [user]);
 
   useEffect(() => {

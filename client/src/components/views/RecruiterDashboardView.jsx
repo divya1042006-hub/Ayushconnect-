@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Briefcase, Users, UserCheck, Award, ArrowRight, ShieldCheck, Sparkles, Filter, ChevronRight, CheckCircle2, AlertCircle, X, Eye } from 'lucide-react';
+import { API_BASE } from '../../api';
 
 export default function RecruiterDashboardView({ setActiveTab }) {
   const [applications, setApplications] = useState([]);
@@ -8,32 +9,34 @@ export default function RecruiterDashboardView({ setActiveTab }) {
   const [loadingAi, setLoadingAi] = useState(false);
 
   useEffect(() => {
-    fetch('/api/recruiter/pipeline')
-      .then(res => res.json())
+    fetch(`${API_BASE}/api/recruiter/pipeline`)
+      .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data.success) setApplications(data.applications);
-      });
+        if (data?.success && Array.isArray(data.applications)) setApplications(data.applications);
+      })
+      .catch(() => {});
   }, []);
 
   const moveStage = (appId, newStage) => {
-    fetch('/api/recruiter/update-status', {
+    fetch(`${API_BASE}/api/recruiter/update-status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ appId, newStage })
     })
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if (data.success) {
+        if (data?.success) {
           setApplications(prev => prev.map(a => a.id === appId ? data.application : a));
           if (selectedApp?.id === appId) setSelectedApp(data.application);
         }
-      });
+      })
+      .catch(() => {});
   };
 
   const generateAiExplanation = (app) => {
     setLoadingAi(true);
     setAiExplanation(null);
-    fetch('/api/ai/explain-match', {
+    fetch(`${API_BASE}/api/ai/explain-match`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -44,10 +47,10 @@ export default function RecruiterDashboardView({ setActiveTab }) {
         gapSkills: app.gapSkills
       })
     })
-      .then(res => res.json())
+      .then(res => res.ok ? res.json() : null)
       .then(data => {
         setLoadingAi(false);
-        if (data.success) setAiExplanation(data.explanation);
+        if (data?.success) setAiExplanation(data.explanation);
       })
       .catch(() => setLoadingAi(false));
   };

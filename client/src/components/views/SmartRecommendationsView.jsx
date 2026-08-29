@@ -207,18 +207,36 @@ export default function SmartRecommendationsView({ user }) {
   };
 
   // ── AI Engine: derive skill gaps from user profile ──────────────────────
-  const rawSkills = user?.skills;
-  const parsedSkills = Array.isArray(rawSkills) 
-    ? rawSkills 
-    : (typeof rawSkills === 'string' ? (() => { try { const p = JSON.parse(rawSkills); return Array.isArray(p) ? p : null; } catch { return null; } })() : null);
-
-  const studentSkills = parsedSkills || [
+  const defaultBaseSkills = [
     { name: 'Panchakarma Procedure Execution', score: 55, target: 90, status: 'gap' },
     { name: 'Abhyanga & Swedana', score: 78, target: 90, status: 'developing' },
     { name: 'Patient Vital Signs Monitoring', score: 88, target: 90, status: 'strong' },
     { name: 'Ayurvedic Herbal Kashaya Preparation', score: 60, target: 90, status: 'developing' },
     { name: 'Sterilization & Aseptic Technique', score: 45, target: 90, status: 'gap' },
   ];
+
+  const rawSkills = user?.skills;
+  let parsedSkills = null;
+  if (Array.isArray(rawSkills) && rawSkills.length > 0) {
+    parsedSkills = rawSkills.map(s => {
+      if (typeof s === 'string') return { name: s, score: 75, target: 90, status: 'developing' };
+      return {
+        name: s?.name || 'Ayush Competency',
+        score: typeof s?.score === 'number' ? s.score : 75,
+        target: typeof s?.target === 'number' ? s.target : 90,
+        status: s?.status || (s?.score >= 80 ? 'strong' : s?.score >= 60 ? 'developing' : 'gap')
+      };
+    });
+  } else if (typeof rawSkills === 'string') {
+    try {
+      const p = JSON.parse(rawSkills);
+      if (Array.isArray(p) && p.length > 0) {
+        parsedSkills = p.map(s => typeof s === 'string' ? { name: s, score: 75, target: 90, status: 'developing' } : s);
+      }
+    } catch (_) {}
+  }
+
+  const studentSkills = (parsedSkills && parsedSkills.length > 0) ? parsedSkills : defaultBaseSkills;
 
   const gapSkills = studentSkills.filter(s => s && s.status === 'gap').map(s => s.name);
   const developingSkills = studentSkills.filter(s => s && s.status === 'developing').map(s => s.name);

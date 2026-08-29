@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Sparkles, Upload, CheckCircle2, ShieldCheck, Cpu, RefreshCw, FileText, X, AlertCircle } from 'lucide-react';
+import { API_BASE } from '../../api';
 
 // NOS Qualification Pack keywords for matching
 const NOS_SKILLS_MAP = {
@@ -200,7 +201,7 @@ export default function ResumeScreeningView() {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
 
-      const res = await fetch('/api/ai/parse-resume', {
+      const res = await fetch(`${API_BASE}/api/ai/parse-resume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ resumeText }),
@@ -209,8 +210,8 @@ export default function ResumeScreeningView() {
       clearTimeout(timeout);
 
       if (res.ok) {
-        const data = await res.json();
-        if (data.success) {
+        const data = await res.json().catch(() => null);
+        if (data?.success) {
           setParsedResult(data.extractedData);
           setParsing(false);
           return;

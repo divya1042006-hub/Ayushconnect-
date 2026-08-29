@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Compass, CheckCircle2, AlertCircle, Award, Sparkles, ChevronRight, BookOpen, Layers, RefreshCw } from 'lucide-react';
+import { API_BASE } from '../../api';
 
 // ── Embedded Qualification Packs (works offline — no API needed) ────────────
 const QUAL_PACKS = [
@@ -96,13 +97,14 @@ export default function StudentRoadmapView({ user, setUser }) {
     const updateUserState = (data) => {
       if (setUser) {
         setUser(prev => {
+          const base = prev || {};
           const updated = {
-            ...prev,
+            ...base,
             targetRole: data.targetPack?.id || data.targetPackId,
             targetRoleTitle: data.targetPack?.title || data.targetRoleTitle,
             readinessScore: data.readinessScore,
             skills: data.skills,
-            xp: (prev?.xp || 1420) + (data.xpGained || 150)
+            xp: (base.xp || 1420) + (data.xpGained || 150)
           };
           try { localStorage.setItem('ayush_user', JSON.stringify(updated)); } catch(e) {}
           return updated;
@@ -112,17 +114,19 @@ export default function StudentRoadmapView({ user, setUser }) {
 
     // Also try the API in the background for persistence
     try {
-      const res = await fetch('/api/students/assess', {
+      const res = await fetch(`${API_BASE}/api/students/assess`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ targetPackId: selectedPackId, answers, studentId: user?.id, studentName: user?.name })
       });
-      const data = await res.json();
-      if (data.success) {
-        setAssessmentResult(data);
-        updateUserState(data);
-        setLoading(false);
-        return;
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (data?.success) {
+          setAssessmentResult(data);
+          updateUserState(data);
+          setLoading(false);
+          return;
+        }
       }
     } catch (_) { /* Server not available — use local result below */ }
 

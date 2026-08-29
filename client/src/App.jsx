@@ -17,48 +17,98 @@ import HelpCentreView from './components/views/HelpCentreView';
 
 import { API_BASE } from './api';
 
+import { supabase } from './supabaseClient';
+
 // Safe user data normalizer
 function sanitizeUser(rawUser) {
   if (!rawUser) return null;
   const user = { ...rawUser };
+  
+  // Normalize skills
   if (typeof user.skills === 'string') {
     try { user.skills = JSON.parse(user.skills); } catch { user.skills = []; }
   }
-  if (!Array.isArray(user.skills)) user.skills = [];
-  
+  if (!Array.isArray(user.skills)) {
+    user.skills = [];
+  }
+  user.skills = user.skills.map(s => {
+    if (typeof s === 'string') {
+      return { name: s, score: 75, target: 90, status: 'developing' };
+    }
+    return {
+      name: s?.name || 'Ayush Clinical Competency',
+      score: typeof s?.score === 'number' ? s.score : 75,
+      target: typeof s?.target === 'number' ? s.target : 90,
+      status: s?.status || (s?.score >= 80 ? 'strong' : s?.score >= 60 ? 'developing' : 'gap')
+    };
+  });
+  if (user.skills.length === 0) {
+    user.skills = [
+      { name: "Abhyanga & Swedana Technique", score: 85, target: 90, status: "strong" },
+      { name: "Kati/Janu Basti Setup & Monitoring", score: 75, target: 85, status: "developing" },
+      { name: "Sterilization & Herbal Dravya Prep", score: 90, target: 90, status: "strong" },
+      { name: "Patient Vitals & Therapy Logging", score: 80, target: 85, status: "developing" },
+      { name: "Ayurvedic Pharmacology Basics", score: 65, target: 80, status: "developing" }
+    ];
+  }
+
+  // Normalize certifications
   if (typeof user.certifications === 'string') {
     try { user.certifications = JSON.parse(user.certifications); } catch { user.certifications = []; }
   }
-  if (!Array.isArray(user.certifications)) user.certifications = [];
-  
+  if (!Array.isArray(user.certifications)) {
+    user.certifications = [];
+  }
+  user.certifications = user.certifications.map(c => {
+    if (typeof c === 'string') {
+      return { title: c, issuer: 'HSSC Ayush Sub-SSC', year: 2025, verified: true };
+    }
+    return {
+      title: c?.title || 'HSSC Certified Ayush Professional',
+      issuer: c?.issuer || 'HSSC Ayush Sub-SSC',
+      year: c?.year || 2025,
+      verified: c?.verified !== false
+    };
+  });
+
   return user;
 }
 
-// React Error Boundary to prevent white screen of death
+// React Error Boundary to prevent white screen and auto-recover smoothly
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false };
+    this.state = { hasError: false, error: null };
   }
-  static getDerivedStateFromError() {
-    return { hasError: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
   }
   componentDidCatch(error, info) {
     console.error('Portal Component Error caught:', error, info);
+  }
+  componentDidUpdate(prevProps) {
+    if (this.state.hasError && (prevProps.activeTab !== this.props.activeTab || prevProps.user !== this.props.user)) {
+      this.setState({ hasError: false, error: null });
+    }
   }
   render() {
     if (this.state.hasError) {
       return (
         <div className="p-8 max-w-xl mx-auto my-12 text-center bg-surface-white rounded-3xl border border-surface-container-high shadow-lg space-y-4 font-manrope">
           <div className="text-4xl">🌿</div>
-          <h2 className="text-xl font-black text-text-main">Dashboard Refresh Required</h2>
-          <p className="text-xs text-outline font-medium">Session initialized. Click below to continue:</p>
-          <button 
-            onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
-            className="px-6 py-2.5 bg-primary text-white rounded-xl text-xs font-black hover:bg-primary-container transition-all shadow-sm"
-          >
-            Continue to Portal →
-          </button>
+          <h2 className="text-xl font-black text-text-main">AyushConnect Portal</h2>
+          <p className="text-xs text-outline font-medium">View updated. Click below to continue:</p>
+          <div className="flex justify-center gap-3">
+            <button 
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                if (this.props.onReset) this.props.onReset();
+              }}
+              className="px-6 py-2.5 bg-primary text-white rounded-xl text-xs font-black hover:bg-primary-container transition-all shadow-sm"
+            >
+              Back to Home Overview →
+            </button>
+          </div>
         </div>
       );
     }
@@ -91,29 +141,35 @@ export default function App() {
 
   const handleLoginSuccess = (loggedInUser, role) => {
     const cleanUser = sanitizeUser(loggedInUser);
+    const resolvedRole = role || cleanUser?.role || 'student';
     setUser(cleanUser);
-    setActiveRole(role);
+    setActiveRole(resolvedRole);
     setIsAuthModalOpen(false);
     try {
       localStorage.setItem('ayush_user', JSON.stringify(cleanUser));
-      localStorage.setItem('ayush_role', role);
+      localStorage.setItem('ayush_role', resolvedRole);
     } catch (e) {
       console.error(e);
     }
     // Auto-navigate to that persona's main portal tab
-    if (role === 'student') setActiveTab('student');
-    else if (role === 'recruiter') setActiveTab('placement');
-    else if (role === 'faculty') setActiveTab('faculty');
-    else if (role === 'institution') setActiveTab('institution');
+    if (resolvedRole === 'student') setActiveTab('student');
+    else if (resolvedRole === 'recruiter') setActiveTab('placement');
+    else if (resolvedRole === 'faculty') setActiveTab('faculty');
+    else if (resolvedRole === 'institution') setActiveTab('institution');
   };
 
   const handleLogout = async () => {
     try {
       localStorage.removeItem('ayush_user');
+      localStorage.removeItem('ayush_role');
+      supabase.auth.signOut().catch(() => {});
       setUser(null);
+      setActiveRole('student');
       setActiveTab('home');
     } catch (e) {
       console.error('Logout error:', e);
+      setUser(null);
+      setActiveTab('home');
     }
   };
 
@@ -154,7 +210,11 @@ export default function App() {
           isSidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[260px]'
         } w-full max-w-[1440px] px-6 sm:px-10 lg:px-12 py-8 md:py-12`}
       >
-        <ErrorBoundary>
+        <ErrorBoundary 
+          activeTab={activeTab} 
+          user={user} 
+          onReset={() => { setActiveTab('home'); setActiveRole('student'); }}
+        >
           {activeTab === 'home' && <HomeView setActiveTab={setActiveTab} setActiveRole={setActiveRole} />}
           {activeTab === 'student' && <StudentDashboardView user={user} setActiveTab={setActiveTab} />}
           {activeTab === 'roadmap' && <StudentRoadmapView user={user} setUser={setUser} />}
