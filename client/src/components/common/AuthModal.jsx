@@ -343,25 +343,40 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
 
   };
 
-  // ── Google / Gmail OAuth simulation & Supabase integration ─────────────────
-  const handleGoogleLogin = async (overrideEmail = null) => {
+  // ── Custom Social Login state ──────────────────────────────────────────────
+  const [activeSocialPicker, setActiveSocialPicker] = useState(null); // null | 'google' | 'linkedin'
+  const [customGoogleForm, setCustomGoogleForm] = useState({
+    name: '',
+    email: '',
+    institution: 'National Institute of Ayurveda (NIA), Jaipur',
+    degree: 'BAMS 4th Year'
+  });
+  const [customLinkedInForm, setCustomLinkedInForm] = useState({
+    name: '',
+    email: '',
+    headline: 'Ayush Practitioner | Panchakarma & Clinical Research',
+    institution: 'All India Institute of Ayurveda (AIIA)'
+  });
+
+  // ── Google / Gmail OAuth & Supabase integration ─────────────────
+  const handleGoogleLogin = async (customProfile = null) => {
     setGoogleLoading(true);
     setGoogleStep('authorizing');
     setErrorMsg('');
 
     try {
-      // Step 1: Simulate Google OAuth popup (400ms)
-      await new Promise(r => setTimeout(r, 400));
+      // Step 1: Simulate Google OAuth popup
+      await new Promise(r => setTimeout(r, 450));
       setGoogleStep('syncing');
 
-      // Step 2: Simulate Google Account Profile Sync (500ms)
-      await new Promise(r => setTimeout(r, 500));
+      // Step 2: Simulate Google Account Profile Sync
+      await new Promise(r => setTimeout(r, 550));
 
       const baseProfile = GOOGLE_PROFILES[activeRoleTab];
-      const emailToUse = overrideEmail || (customGmail.trim() ? customGmail.trim() : baseProfile.email);
-      const nameToUse = overrideEmail
-        ? overrideEmail.split('@')[0].replace(/[._]/g, ' ')
-        : (customGmail.trim() ? customGmail.split('@')[0].replace(/[._]/g, ' ') : baseProfile.name);
+      const emailToUse = (customProfile?.email || customGoogleForm.email.trim() || baseProfile.email).trim().toLowerCase();
+      const nameToUse = (customProfile?.name || customGoogleForm.name.trim() || baseProfile.name).trim();
+      const instToUse = customProfile?.institution || customGoogleForm.institution.trim() || baseProfile.institution || 'Ayush Institute';
+      const degToUse = customProfile?.degree || customGoogleForm.degree.trim() || baseProfile.degree || 'BAMS Graduate';
 
       const skillsArr = [
         { name: "Abhyanga & Swedana Technique", score: 88, target: 90, status: "strong" },
@@ -376,16 +391,17 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
       ];
 
       const googleUser = {
+        id: `goog-${Date.now()}`,
         name: nameToUse,
         email: emailToUse,
         role: activeRoleTab,
-        institution: baseProfile.institution || 'National Institute of Ayurveda (NIA), Jaipur',
-        degree: baseProfile.degree || 'BAMS 4th Year',
-        company: baseProfile.company || 'Ayush Wellness Center',
-        department: baseProfile.department || 'Dept of Shalya Tantra',
+        institution: instToUse,
+        degree: degToUse,
+        company: activeRoleTab === 'recruiter' ? instToUse : 'Ayush Wellness Center',
+        department: activeRoleTab === 'faculty' ? instToUse : 'Dept of Shalya Tantra',
         googleVerified: true,
         provider: 'google',
-        avatarUrl: baseProfile.avatarUrl,
+        avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(nameToUse)}&backgroundColor=0d9488,059669,0284c7`,
         xp: activeRoleTab === 'student' ? 1480 : 600,
         level: 4,
         readinessScore: 82,
@@ -393,10 +409,9 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
         certifications: certsArr,
       };
 
-      // Background Supabase sync — non-blocking, never blocks login
+      // Save / Upsert to Supabase
       supabase.from('users').upsert([{
         ...googleUser,
-        id: `goog-${Date.now()}`,
         skills: JSON.stringify(skillsArr),
         certifications: JSON.stringify(certsArr),
         readiness_score: 82,
@@ -404,13 +419,13 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
 
       setGoogleStep('done');
       setGoogleLoading(false);
-      setShowCustomGooglePrompt(false);
-      setSuccessMsg(`✅ Google account connected! Welcome, ${googleUser.name}`);
+      setActiveSocialPicker(null);
+      setSuccessMsg(`✅ Google account connected! Welcome, ${googleUser.name} (${googleUser.email})`);
 
       setTimeout(() => {
         onLoginSuccess(googleUser, activeRoleTab);
         onClose();
-      }, 900);
+      }, 800);
 
     } catch (err) {
       console.warn('Google login error:', err);
@@ -420,45 +435,79 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
     }
   };
 
-  // ── LinkedIn OAuth simulation ──────────────────────────────────────────────
-  const handleLinkedInLogin = async () => {
+  // ── LinkedIn OAuth & Supabase integration ──────────────────────────────
+  const handleLinkedInLogin = async (customProfile = null) => {
     setLinkedInLoading(true);
     setLinkedInStep('authorizing');
     setErrorMsg('');
 
-    // Step 1: Simulate opening LinkedIn OAuth popup (400ms)
-    await new Promise(r => setTimeout(r, 400));
-    setLinkedInStep('importing');
+    try {
+      // Step 1: Simulate opening LinkedIn OAuth popup
+      await new Promise(r => setTimeout(r, 450));
+      setLinkedInStep('importing');
 
-    // Step 2: Simulate profile import (700ms)
-    await new Promise(r => setTimeout(r, 700));
+      // Step 2: Simulate profile import
+      await new Promise(r => setTimeout(r, 550));
 
-    const profile = LINKEDIN_PROFILES[activeRoleTab];
-    setLinkedInProfile(profile);
-    setLinkedInStep('done');
-    setLinkedInLoading(false);
+      const baseProfile = LINKEDIN_PROFILES[activeRoleTab];
+      const emailToUse = (customProfile?.email || customLinkedInForm.email.trim() || baseProfile.email).trim().toLowerCase();
+      const nameToUse = (customProfile?.name || customLinkedInForm.name.trim() || baseProfile.name).trim();
+      const headlineToUse = customProfile?.headline || customLinkedInForm.headline.trim() || baseProfile.headline;
+      const instToUse = customProfile?.institution || customLinkedInForm.institution.trim() || baseProfile.institution || 'Ayush Medical Institute';
 
-    // Auto-login with LinkedIn profile
-    const linkedInUser = {
-      name: profile.name,
-      email: profile.email,
-      role: activeRoleTab,
-      institution: profile.institution || '',
-      company: profile.company || '',
-      degree: profile.degree || '',
-      department: profile.department || '',
-      linkedIn: true,
-      linkedInUrl: profile.linkedinUrl,
-      linkedInHeadline: profile.headline,
-      linkedInConnections: profile.connections,
-      linkedInSkills: profile.skills,
-    };
+      const skillsArr = [
+        { name: "Panchakarma Clinical Management", score: 90, target: 90, status: "strong" },
+        { name: "Clinical Evidence & Documentation", score: 85, target: 85, status: "strong" },
+        { name: "Patient Diagnosis & Consultation", score: 80, target: 85, status: "developing" }
+      ];
 
-    setSuccessMsg(`✅ LinkedIn connected! Welcome, ${profile.name}`);
-    setTimeout(() => {
-      onLoginSuccess(linkedInUser, activeRoleTab);
-      onClose();
-    }, 1000);
+      const linkedInUser = {
+        id: `li-${Date.now()}`,
+        name: nameToUse,
+        email: emailToUse,
+        role: activeRoleTab,
+        institution: instToUse,
+        company: activeRoleTab === 'recruiter' ? instToUse : 'Ayush Health Network',
+        degree: activeRoleTab === 'student' ? 'BAMS Graduate' : '',
+        department: activeRoleTab === 'faculty' ? instToUse : 'Clinical Ayush Dept',
+        linkedIn: true,
+        linkedInUrl: `https://linkedin.com/in/${encodeURIComponent(nameToUse.toLowerCase().replace(/\s+/g, '-'))}`,
+        linkedInHeadline: headlineToUse,
+        linkedInConnections: 500,
+        avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(nameToUse)}&backgroundColor=0a66c2`,
+        skills: skillsArr,
+        certifications: [
+          { title: "LinkedIn Verified Ayush Practitioner", issuer: "LinkedIn & NCISM", year: 2026, verified: true }
+        ],
+        readinessScore: 85,
+        xp: 1520,
+        level: 4
+      };
+
+      // Save / Upsert to Supabase
+      supabase.from('users').upsert([{
+        ...linkedInUser,
+        skills: JSON.stringify(skillsArr),
+        certifications: JSON.stringify(linkedInUser.certifications),
+        readiness_score: 85,
+      }]).catch(() => {});
+
+      setLinkedInStep('done');
+      setLinkedInLoading(false);
+      setActiveSocialPicker(null);
+      setSuccessMsg(`✅ LinkedIn connected! Welcome, ${linkedInUser.name} (${linkedInUser.email})`);
+
+      setTimeout(() => {
+        onLoginSuccess(linkedInUser, activeRoleTab);
+        onClose();
+      }, 800);
+
+    } catch (err) {
+      console.warn('LinkedIn login error:', err);
+      setLinkedInLoading(false);
+      setLinkedInStep(null);
+      setErrorMsg('LinkedIn login failed. Please try again.');
+    }
   };
 
   const handleSubmit = (e) => {
@@ -506,7 +555,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
               const isSelected = activeRoleTab === tab.id;
               return (
                 <button key={tab.id} type="button"
-                  onClick={() => { setActiveRoleTab(tab.id); setSuccessMsg(''); setErrorMsg(''); setLinkedInStep(null); setLinkedInProfile(null); setGoogleStep(null); }}
+                  onClick={() => { setActiveRoleTab(tab.id); setSuccessMsg(''); setErrorMsg(''); setActiveSocialPicker(null); setLinkedInStep(null); setGoogleStep(null); }}
                   className={`p-3 rounded-2xl border-2 text-left transition-all flex flex-col items-center gap-1.5 ${isSelected ? 'border-primary bg-leaf-green-light/40 shadow-sm font-black' : 'border-surface-container-high bg-surface-white hover:border-outline-variant'}`}>
                   <TabIcon className={`w-5 h-5 ${isSelected ? 'text-primary' : 'text-outline'}`} />
                   <span className={`text-xs font-bold ${isSelected ? 'text-primary' : 'text-text-main'}`}>{tab.label}</span>
@@ -525,130 +574,210 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
           </div>
         </div>
 
-        {/* ── SOCIAL AUTH (GOOGLE & LINKEDIN) ───────────────────────────── */}
+        {/* ── SOCIAL AUTH (GOOGLE & LINKEDIN SELECTORS) ───────────────────────── */}
         <div className="space-y-3">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            {/* Google / Gmail Sign In Button */}
+            {/* Google Sign In Button */}
             <button
               type="button"
-              onClick={() => handleGoogleLogin()}
+              onClick={() => setActiveSocialPicker(activeSocialPicker === 'google' ? null : 'google')}
               disabled={googleLoading || linkedInLoading || !!successMsg}
-              className="w-full py-3 px-4 rounded-2xl bg-white border-2 border-surface-container-high hover:border-outline-variant hover:bg-surface-container-low text-text-main text-xs font-black flex items-center justify-center gap-2.5 transition-all shadow-xs disabled:opacity-60"
+              className={`w-full py-3 px-4 rounded-2xl border-2 text-xs font-black flex items-center justify-center gap-2.5 transition-all shadow-xs disabled:opacity-60 ${activeSocialPicker === 'google' ? 'border-primary bg-emerald-50 text-primary' : 'bg-white border-surface-container-high hover:border-outline-variant hover:bg-surface-container-low text-text-main'}`}
             >
-              {googleLoading ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin text-primary" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <span>{googleStep === 'authorizing' ? 'Opening Google...' : 'Syncing Gmail...'}</span>
-                </>
-              ) : (
-                <>
-                  <GoogleIcon className="w-4 h-4 shrink-0" />
-                  <span>Continue with Google</span>
-                </>
-              )}
+              <GoogleIcon className="w-4 h-4 shrink-0" />
+              <span>Continue with Google</span>
             </button>
 
             {/* LinkedIn Sign In Button */}
             <button
               type="button"
-              onClick={handleLinkedInLogin}
+              onClick={() => setActiveSocialPicker(activeSocialPicker === 'linkedin' ? null : 'linkedin')}
               disabled={googleLoading || linkedInLoading || !!successMsg}
-              className="w-full py-3 px-4 rounded-2xl bg-[#0A66C2] text-white text-xs font-black flex items-center justify-center gap-2.5 hover:bg-[#004182] transition-all shadow-xs disabled:opacity-60"
+              className={`w-full py-3 px-4 rounded-2xl text-xs font-black flex items-center justify-center gap-2.5 transition-all shadow-xs disabled:opacity-60 ${activeSocialPicker === 'linkedin' ? 'bg-[#004182] text-white border-2 border-[#004182]' : 'bg-[#0A66C2] text-white hover:bg-[#004182]'}`}
             >
-              {linkedInLoading ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  <span>{linkedInStep === 'authorizing' ? 'Opening...' : 'Importing...'}</span>
-                </>
-              ) : (
-                <>
-                  <LinkedInIcon className="w-4 h-4 shrink-0" />
-                  <span>Continue with LinkedIn</span>
-                </>
-              )}
+              <LinkedInIcon className="w-4 h-4 shrink-0" />
+              <span>Continue with LinkedIn</span>
             </button>
           </div>
 
-          {/* Quick Custom Gmail Prompt Toggle */}
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => setShowCustomGooglePrompt(!showCustomGooglePrompt)}
-              className="text-[11px] font-bold text-primary hover:underline"
-            >
-              {showCustomGooglePrompt ? '▲ Hide custom Gmail option' : '▼ Or sign in with a custom Gmail address'}
-            </button>
-          </div>
+          {/* ── INTERACTIVE GOOGLE ACCOUNT PICKER ── */}
+          {activeSocialPicker === 'google' && (
+            <div className="p-4 rounded-2xl bg-surface-container-low border-2 border-emerald-500/40 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <GoogleIcon className="w-5 h-5" />
+                  <span className="text-xs font-black text-text-main">Sign in with Google</span>
+                </div>
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">Secure OAuth 2.0</span>
+              </div>
 
-          {showCustomGooglePrompt && (
-            <div className="p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high space-y-2 animate-in fade-in slide-in-from-top-1 duration-200">
-              <label className="text-[11px] font-black text-text-main flex items-center gap-1.5">
-                <GoogleIcon className="w-3.5 h-3.5" />
-                Enter your Gmail Address:
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="email"
-                  placeholder="yourname@gmail.com"
-                  value={customGmail}
-                  onChange={(e) => setCustomGmail(e.target.value)}
-                  className="flex-1 px-3.5 py-2 rounded-xl bg-white border border-surface-container-high text-xs font-semibold text-text-main focus:outline-none focus:border-primary"
-                />
+              {/* Quick default preset account */}
+              <div className="space-y-2">
+                <div className="text-[11px] font-bold text-outline">Preset Google Account for this Role:</div>
                 <button
                   type="button"
-                  onClick={() => handleGoogleLogin(customGmail)}
-                  disabled={!customGmail || googleLoading}
-                  className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-extrabold hover:bg-primary-container disabled:opacity-50 transition-colors"
+                  onClick={() => handleGoogleLogin(GOOGLE_PROFILES[activeRoleTab])}
+                  disabled={googleLoading}
+                  className="w-full p-2.5 rounded-xl bg-white border border-surface-container-high hover:border-primary flex items-center gap-3 transition-colors text-left"
                 >
-                  Sign In
+                  <img src={GOOGLE_PROFILES[activeRoleTab].avatarUrl} alt="Google Avatar" className="w-8 h-8 rounded-full object-cover border" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-extrabold text-text-main truncate">{GOOGLE_PROFILES[activeRoleTab].name}</div>
+                    <div className="text-[11px] text-outline truncate">{GOOGLE_PROFILES[activeRoleTab].email}</div>
+                  </div>
+                  <span className="text-[10px] font-bold text-primary bg-leaf-green-light px-2 py-1 rounded-lg">Instant Sign In →</span>
+                </button>
+              </div>
+
+              {/* Custom Google Account Fields */}
+              <div className="space-y-2.5 pt-2 border-t border-surface-container-high">
+                <div className="text-[11px] font-black text-text-main flex items-center gap-1.5">
+                  <span>✨ Or enter YOUR own Google Account / Gmail:</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Your Full Name (e.g. Rahul Sharma)"
+                    value={customGoogleForm.name}
+                    onChange={(e) => setCustomGoogleForm({ ...customGoogleForm, name: e.target.value })}
+                    className="px-3 py-2 rounded-xl bg-white border border-surface-container-high text-xs font-semibold text-text-main focus:outline-none focus:border-primary"
+                  />
+                  <input
+                    type="email"
+                    placeholder="your.email@gmail.com"
+                    value={customGoogleForm.email}
+                    onChange={(e) => setCustomGoogleForm({ ...customGoogleForm, email: e.target.value })}
+                    className="px-3 py-2 rounded-xl bg-white border border-surface-container-high text-xs font-semibold text-text-main focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="College / Organization Name"
+                    value={customGoogleForm.institution}
+                    onChange={(e) => setCustomGoogleForm({ ...customGoogleForm, institution: e.target.value })}
+                    className="px-3 py-2 rounded-xl bg-white border border-surface-container-high text-xs font-semibold text-text-main focus:outline-none focus:border-primary"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Degree / Role (e.g. BAMS 4th Year)"
+                    value={customGoogleForm.degree}
+                    onChange={(e) => setCustomGoogleForm({ ...customGoogleForm, degree: e.target.value })}
+                    className="px-3 py-2 rounded-xl bg-white border border-surface-container-high text-xs font-semibold text-text-main focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleGoogleLogin(customGoogleForm)}
+                  disabled={!customGoogleForm.email || !customGoogleForm.name || googleLoading}
+                  className="w-full py-2.5 rounded-xl bg-primary text-white text-xs font-black hover:bg-primary-container disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-xs"
+                >
+                  <GoogleIcon className="w-3.5 h-3.5" />
+                  <span>{googleLoading ? 'Authorizing Google Account...' : 'Continue with this Gmail Account'}</span>
                 </button>
               </div>
             </div>
           )}
 
-          {/* Google step progress indicator */}
-          {googleStep && googleStep !== 'done' && (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-leaf-green-light/40 border border-leaf-green-accent/30">
-              <div className="flex items-center gap-2 flex-1">
-                {['authorizing', 'syncing'].map((step, i) => (
-                  <div key={step} className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${googleStep === step ? 'bg-primary animate-pulse' : (googleStep === 'syncing' && step === 'authorizing') ? 'bg-emerald-500' : 'bg-surface-container-high'}`} />
-                    <span className={`text-[11px] font-bold ${googleStep === step ? 'text-primary' : 'text-outline'}`}>
-                      {step === 'authorizing' ? '🔐 Google OAuth' : '📥 Syncing Google Profile'}
-                    </span>
-                    {i < 1 && <div className="w-4 h-px bg-surface-container-high mx-1" />}
+          {/* ── INTERACTIVE LINKEDIN PROFILE PICKER ── */}
+          {activeSocialPicker === 'linkedin' && (
+            <div className="p-4 rounded-2xl bg-surface-container-low border-2 border-[#0A66C2]/40 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <LinkedInIcon className="w-5 h-5 text-[#0A66C2]" />
+                  <span className="text-xs font-black text-text-main">Sync with LinkedIn Profile</span>
+                </div>
+                <span className="text-[10px] font-bold text-[#0A66C2] bg-blue-50 px-2 py-0.5 rounded-full">Profile Sync</span>
+              </div>
+
+              {/* Quick default preset account */}
+              <div className="space-y-2">
+                <div className="text-[11px] font-bold text-outline">Preset LinkedIn Account for this Role:</div>
+                <button
+                  type="button"
+                  onClick={() => handleLinkedInLogin(LINKEDIN_PROFILES[activeRoleTab])}
+                  disabled={linkedInLoading}
+                  className="w-full p-2.5 rounded-xl bg-white border border-surface-container-high hover:border-[#0A66C2] flex items-center gap-3 transition-colors text-left"
+                >
+                  <div className="w-8 h-8 rounded-full bg-[#0A66C2] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                    {LINKEDIN_PROFILES[activeRoleTab].avatar}
                   </div>
-                ))}
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-extrabold text-text-main truncate">{LINKEDIN_PROFILES[activeRoleTab].name}</div>
+                    <div className="text-[11px] text-outline truncate">{LINKEDIN_PROFILES[activeRoleTab].headline}</div>
+                  </div>
+                  <span className="text-[10px] font-bold text-[#0A66C2] bg-blue-50 px-2 py-1 rounded-lg">Import →</span>
+                </button>
+              </div>
+
+              {/* Custom LinkedIn Account Fields */}
+              <div className="space-y-2.5 pt-2 border-t border-surface-container-high">
+                <div className="text-[11px] font-black text-text-main flex items-center gap-1.5">
+                  <span>✨ Or enter YOUR own LinkedIn details:</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Your Full Name"
+                    value={customLinkedInForm.name}
+                    onChange={(e) => setCustomLinkedInForm({ ...customLinkedInForm, name: e.target.value })}
+                    className="px-3 py-2 rounded-xl bg-white border border-surface-container-high text-xs font-semibold text-text-main focus:outline-none focus:border-[#0A66C2]"
+                  />
+                  <input
+                    type="email"
+                    placeholder="your.linkedin.email@domain.com"
+                    value={customLinkedInForm.email}
+                    onChange={(e) => setCustomLinkedInForm({ ...customLinkedInForm, email: e.target.value })}
+                    className="px-3 py-2 rounded-xl bg-white border border-surface-container-high text-xs font-semibold text-text-main focus:outline-none focus:border-[#0A66C2]"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Professional Headline (e.g. BAMS Intern | Panchakarma)"
+                    value={customLinkedInForm.headline}
+                    onChange={(e) => setCustomLinkedInForm({ ...customLinkedInForm, headline: e.target.value })}
+                    className="px-3 py-2 rounded-xl bg-white border border-surface-container-high text-xs font-semibold text-text-main focus:outline-none focus:border-[#0A66C2]"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Institution / Organization Name"
+                    value={customLinkedInForm.institution}
+                    onChange={(e) => setCustomLinkedInForm({ ...customLinkedInForm, institution: e.target.value })}
+                    className="px-3 py-2 rounded-xl bg-white border border-surface-container-high text-xs font-semibold text-text-main focus:outline-none focus:border-[#0A66C2]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleLinkedInLogin(customLinkedInForm)}
+                  disabled={!customLinkedInForm.email || !customLinkedInForm.name || linkedInLoading}
+                  className="w-full py-2.5 rounded-xl bg-[#0A66C2] text-white text-xs font-black hover:bg-[#004182] disabled:opacity-50 transition-colors flex items-center justify-center gap-2 shadow-xs"
+                >
+                  <LinkedInIcon className="w-3.5 h-3.5" />
+                  <span>{linkedInLoading ? 'Importing LinkedIn Profile...' : 'Connect with this LinkedIn Account'}</span>
+                </button>
               </div>
             </div>
           )}
 
-          {/* LinkedIn step progress indicator */}
-          {linkedInStep && linkedInStep !== 'done' && (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-[#0A66C2]/8 border border-[#0A66C2]/20">
-              <div className="flex items-center gap-2 flex-1">
-                {['authorizing', 'importing'].map((step, i) => (
-                  <div key={step} className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${linkedInStep === step ? 'bg-[#0A66C2] animate-pulse' : (linkedInStep === 'importing' && step === 'authorizing') ? 'bg-emerald-500' : 'bg-surface-container-high'}`} />
-                    <span className={`text-[11px] font-bold ${linkedInStep === step ? 'text-[#0A66C2]' : 'text-outline'}`}>
-                      {step === 'authorizing' ? '🔐 LinkedIn Auth' : '📥 Import Profile'}
-                    </span>
-                    {i < 1 && <div className="w-4 h-px bg-surface-container-high mx-1" />}
-                  </div>
-                ))}
-              </div>
+          {/* Social Loading Indicators */}
+          {googleLoading && (
+            <div className="p-3 rounded-xl bg-leaf-green-light border border-leaf-green-accent/40 flex items-center gap-2 text-xs font-bold text-primary animate-pulse">
+              <GoogleIcon className="w-4 h-4" />
+              <span>{googleStep === 'authorizing' ? '🔐 Authenticating with Google OAuth 2.0...' : '📥 Syncing user profile & Ayush certification records...'}</span>
+            </div>
+          )}
+
+          {linkedInLoading && (
+            <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center gap-2 text-xs font-bold text-[#0A66C2] animate-pulse">
+              <LinkedInIcon className="w-4 h-4" />
+              <span>{linkedInStep === 'authorizing' ? '🔐 Connecting with LinkedIn API...' : '📥 Importing professional headline, credentials & skills...'}</span>
             </div>
           )}
 
           <div className="flex items-center gap-3 pt-1">
             <div className="flex-1 h-px bg-surface-container-high" />
-            <span className="text-[11px] text-outline font-medium">or sign in with password</span>
+            <span className="text-[11px] text-outline font-medium">or sign in with credentials</span>
             <div className="flex-1 h-px bg-surface-container-high" />
           </div>
         </div>

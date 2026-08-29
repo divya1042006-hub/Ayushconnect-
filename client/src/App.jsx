@@ -14,6 +14,8 @@ import FacultyDashboardView from './components/views/FacultyDashboardView';
 import InstitutionDashboardView from './components/views/InstitutionDashboardView';
 import HelpCentreView from './components/views/HelpCentreView';
 
+import { API_BASE } from './api';
+
 export default function App() {
   const [activeTab, setActiveTab] = useState('home');
   const [activeRole, setActiveRole] = useState(() => {
@@ -35,14 +37,14 @@ export default function App() {
   useEffect(() => {
     // Only fetch default user if there isn't already a user in state or user matches active role
     if (!user || user.role !== activeRole) {
-      fetch(`/api/auth/me?role=${activeRole}`)
-        .then(res => res.json())
+      fetch(`${API_BASE}/api/auth/me?role=${activeRole}`)
+        .then(res => res.ok ? res.json() : null)
         .then(data => {
-          if (data.success && !user) {
+          if (data?.success && !user) {
             setUser(data.user);
           }
         })
-        .catch(err => console.error(err));
+        .catch(() => {});
     }
   }, [activeRole]);
 
