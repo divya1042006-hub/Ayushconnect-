@@ -1,0 +1,110 @@
+[
+  {
+    "id": "qp-panchakarma",
+    "code": "HSS/Q5701",
+    "title": "Panchakarma Paricharaka",
+    "sector": "Ayush Sub-SSC / Ayurveda",
+    "level": "NSQF Level 4",
+    "description": "Assisting Vaidyas/Ayurvedic Physicians in administering classical Panchakarma therapies (Snehana, Swedana, Vamana, Virechana, Basti, Nasya, Raktamokshana) safely and hygienically.",
+    "coreCompetencies": [
+      "Abhyanga & Swedana Technique",
+      "Kati/Janu Basti Setup & Monitoring",
+      "Sterilization & Herbal Dravya Prep",
+      "Patient Vitals & Therapy Logging",
+      "Ayurvedic Pharmacology Basics"
+    ],
+    "requiredCertifications": [
+      "HSSC Panchakarma Attendant Certificate",
+      "Ayush First-Aid & Emergency Response",
+      "Basic Anatomical & Physiological Terms (Ayurveda)"
+    ],
+    "weightage": {
+      "Abhyanga & Swedana Technique": 25,
+      "Kati/Janu Basti Setup & Monitoring": 20,
+      "Sterilization & Herbal Dravya Prep": 20,
+      "Patient Vitals & Therapy Logging": 15,
+      "Ayurvedic Pharmacology Basics": 20
+    }
+  },
+  {
+    "id": "qp-yoga",
+    "code": "HSS/Q2301",
+    "title": "Yoga Wellness Trainer",
+    "sector": "Ayush Sub-SSC / Yoga & Naturopathy",
+    "level": "NSQF Level 5",
+    "description": "Designing and delivering evidence-based Yoga wellness programs, Asana/Pranayama protocols, and stress mitigation sessions for individual patients and corporate settings.",
+    "coreCompetencies": [
+      "Asana & Alignment Precision",
+      "Pranayama & Shatkarma Protocols",
+      "Anatomy & Physiology of Yoga",
+      "Client Assessment & Wellness Planning",
+      "Yogic Lifestyle & Diet Counseling"
+    ],
+    "requiredCertifications": [
+      "YCB Level 2 Wellness Yoga Protocol",
+      "Cardiopulmonary Resuscitation (CPR)",
+      "Naturopathic Hydrotherapy Basics"
+    ],
+    "weightage": {
+      "Asana & Alignment Precision": 25,
+      "Pranayama & Shatkarma Protocols": 20,
+      "Anatomy & Physiology of Yoga": 20,
+      "Client Assessment & Wellness Planning": 20,
+      "Yogic Lifestyle & Diet Counseling": 15
+    }
+  },
+  {
+    "id": "qp-kshara",
+    "code": "HSS/Q5702",
+    "title": "Kshara Karma Technician",
+    "sector": "Ayush Sub-SSC / Ayurveda Surgery",
+    "level": "NSQF Level 4",
+    "description": "Specialized clinical assistance in Shalya Tantra (Ayurvedic surgery), Kshara Sutra thread preparation, cauterization kit sterilization, and ano-rectal patient care.",
+    "coreCompetencies": [
+      "Kshara Sutra Preparation & Standardization",
+      "OT Sterilization & Shalya Protocols",
+      "Post-Operative Wound Care (Ayurvedic)",
+      "Herbal Kshara Formulation Handling",
+      "Surgical Instrument Maintenance"
+    ],
+    "requiredCertifications": [
+      "HSSC Kshara Karma Assistant Certification",
+      "Clinical Infection Control Protocol",
+      "Shalya Tantra Assistance Basics"
+    ],
+    "weightage": {
+      "Kshara Sutra Preparation & Standardization": 30,
+      "OT Sterilization & Shalya Protocols": 25,
+      "Post-Operative Wound Care (Ayurvedic)": 20,
+      "Herbal Kshara Formulation Handling": 15,
+      "Surgical Instrument Maintenance": 10
+    }
+  },
+  {
+    "id": "qp-ahara",
+    "code": "HSS/Q5703",
+    "title": "Ayurveda Ahara & Poshana Sahayak",
+    "sector": "Ayush Sub-SSC / Dietetics & Pharma",
+    "level": "NSQF Level 4",
+    "description": "Formulating Pathya-Apathya (dietary regimens) based on Prakriti, preparing therapeutic Ayush nutraceuticals, and managing institutional Ayush kitchens.",
+    "coreCompetencies": [
+      "Pathya-Apathya Formulation",
+      "Prakriti-Based Diet Planning",
+      "Ayush Nutraceutical Hygiene & Storage",
+      "Nutritional Bio-Availability Assessment",
+      "FSSAI Ayush Food Regulations"
+    ],
+    "requiredCertifications": [
+      "FSSAI Ayush Ahara Safety Officer",
+      "Ayurvedic Culinary Therapy Certification",
+      "Basic Clinical Dietetics"
+    ],
+    "weightage": {
+      "Pathya-Apathya Formulation": 25,
+      "Prakriti-Based Diet Planning": 25,
+      "Ayush Nutraceutical Hygiene & Storage": 20,
+      "Nutritional Bio-Availability Assessment": 15,
+      "FSSAI Ayush Food Regulations": 15
+    }
+  }
+]
