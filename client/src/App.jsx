@@ -203,6 +203,7 @@ export default function App() {
       {/* Top Header next to Sidebar */}
       <Header
         activeTab={activeTab}
+        setActiveTab={setActiveTab}
         activeRole={activeRole}
         setActiveRole={setActiveRole}
         user={user}
