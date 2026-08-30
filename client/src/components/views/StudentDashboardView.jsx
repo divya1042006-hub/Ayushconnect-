@@ -153,7 +153,26 @@ export default function StudentDashboardView({ user, setActiveTab }) {
   const [enrolledCourses, setEnrolledCourses] = useState({});
   const [courseLevel, setCourseLevel] = useState('All');
 
-  // Opportunities states
+  const [applications, setApplications] = useState([
+    {
+      id: 'app-1',
+      roleApplied: 'Panchakarma Intern',
+      company: 'Patanjali Wellness Hub',
+      appliedDate: 'Aug 24, 2026',
+      matchScore: 94,
+      status: 'Shortlisted',
+      jobId: 'job-001'
+    },
+    {
+      id: 'app-2',
+      roleApplied: 'Ayurvedic Clinical Trainee',
+      company: 'Dabur Health Research',
+      appliedDate: 'Aug 18, 2026',
+      matchScore: 88,
+      status: 'Interview',
+      jobId: 'job-002'
+    }
+  ]);
   const [sectorFilter, setSectorFilter] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [appliedInternships, setAppliedInternships] = useState({});

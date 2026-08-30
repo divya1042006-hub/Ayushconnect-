@@ -74,46 +74,38 @@ function sanitizeUser(rawUser) {
   return user;
 }
 
-// React Error Boundary — auto-recovers silently, no user action needed
+// React Error Boundary — handles unexpected render errors gracefully
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
-    this.state = { hasError: false, recovering: false };
-    this._resetTimer = null;
+    this.state = { hasError: false, error: null };
   }
-  static getDerivedStateFromError() {
-    return { hasError: true, recovering: true };
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
   }
   componentDidCatch(error, info) {
-    console.warn('Portal caught a render error (auto-recovering):', error?.message);
-    // Auto-reset after 150ms — user never sees the error screen
-    this._resetTimer = setTimeout(() => {
-      this.setState({ hasError: false, recovering: false });
-      if (this.props.onReset) this.props.onReset();
-    }, 150);
+    console.error('Portal component render error:', error, info);
   }
   componentDidUpdate(prevProps) {
-    // Also reset instantly when user logs in/out or tab changes
     if (this.state.hasError && (
       prevProps.activeTab !== this.props.activeTab ||
       prevProps.user !== this.props.user
     )) {
-      clearTimeout(this._resetTimer);
-      this.setState({ hasError: false, recovering: false });
+      this.setState({ hasError: false, error: null });
     }
   }
-  componentWillUnmount() {
-    clearTimeout(this._resetTimer);
-  }
   render() {
-    if (this.state.hasError || this.state.recovering) {
-      // Show a subtle loading spinner instead of the error screen
+    if (this.state.hasError) {
       return (
-        <div className="flex items-center justify-center min-h-[40vh]">
-          <div className="flex flex-col items-center gap-3 text-outline">
-            <div className="w-8 h-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-            <span className="text-xs font-semibold text-outline">Loading...</span>
-          </div>
+        <div className="bg-surface-white rounded-3xl p-8 border border-red-200 text-center space-y-4 max-w-lg mx-auto my-12 shadow-wellness">
+          <div className="text-red-700 font-black text-lg">Section Encountered an Issue</div>
+          <p className="text-xs text-outline font-medium">Click below to retry loading this view.</p>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="px-6 py-2.5 rounded-xl bg-primary text-white text-xs font-bold shadow-md hover:bg-primary-container transition-all"
+          >
+            Retry View
+          </button>
         </div>
       );
     }
