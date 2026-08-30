@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Award, Zap, Compass, Plus, CheckCircle2, AlertCircle, Clock, MapPin,
   Building, ShieldCheck, Sparkles, Send, BookOpen, Play, Star, Filter,
-  Search, Briefcase, Globe, ChevronRight, TrendingUp, Users, BadgeCheck, RefreshCw
+  Search, Briefcase, Globe, ChevronRight, TrendingUp, Users, BadgeCheck, RefreshCw,
+  FileText, Cpu
 } from 'lucide-react';
 import AddCertificateModal from '../common/AddCertificateModal';
 import { API_BASE } from '../../api';
@@ -369,32 +370,44 @@ export default function StudentDashboardView({ user, setActiveTab }) {
           {/* Left 2 Columns */}
           <div className="lg:col-span-2 space-y-8">
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <button onClick={() => setActiveTab('roadmap')} className="p-6 rounded-3xl bg-surface-white border border-surface-container-high shadow-wellness hover:shadow-wellness-hover hover:border-leaf-green-accent transition-all text-left group space-y-3">
-                <div className="p-3 rounded-2xl bg-leaf-green-light text-primary w-fit group-hover:scale-110 transition-transform">
-                  <Compass className="w-6 h-6" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <button onClick={() => setActiveTab('screening')} className="p-5 rounded-3xl bg-surface-white border-2 border-emerald-300 shadow-wellness hover:shadow-wellness-hover hover:border-primary transition-all text-left group space-y-2.5 relative overflow-hidden">
+                <div className="p-2.5 rounded-2xl bg-emerald-100 text-emerald-800 w-fit group-hover:scale-110 transition-transform">
+                  <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-text-main">HSSC Gap Report</div>
-                  <div className="text-xs text-outline mt-0.5 font-medium">Analyze target skills</div>
+                  <div className="text-xs font-black text-primary flex items-center gap-1">
+                    <span>Resume Skill Match</span>
+                    <span className="text-[9px] bg-emerald-600 text-white px-1.5 py-0.2 rounded-full font-bold">AI</span>
+                  </div>
+                  <div className="text-[11px] text-outline mt-0.5 font-medium">Upload & map 6+ roles</div>
                 </div>
               </button>
-              <button onClick={() => setActiveSection('courses')} className="p-6 rounded-3xl bg-surface-white border border-surface-container-high shadow-wellness hover:shadow-wellness-hover hover:border-purple-300 transition-all text-left group space-y-3">
-                <div className="p-3 rounded-2xl bg-purple-100 text-purple-800 w-fit group-hover:scale-110 transition-transform">
-                  <BookOpen className="w-6 h-6" />
+              <button onClick={() => setActiveTab('roadmap')} className="p-5 rounded-3xl bg-surface-white border border-surface-container-high shadow-wellness hover:shadow-wellness-hover hover:border-leaf-green-accent transition-all text-left group space-y-2.5">
+                <div className="p-2.5 rounded-2xl bg-leaf-green-light text-primary w-fit group-hover:scale-110 transition-transform">
+                  <Compass className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-text-main">Browse Courses</div>
-                  <div className="text-xs text-outline mt-0.5 font-medium">{COURSES.length} HSSC courses</div>
+                  <div className="text-xs font-bold text-text-main">HSSC Gap Report</div>
+                  <div className="text-[11px] text-outline mt-0.5 font-medium">Analyze target skills</div>
                 </div>
               </button>
-              <button onClick={() => setIsAddCertOpen(true)} className="p-6 rounded-3xl bg-surface-white border border-surface-container-high shadow-wellness hover:shadow-wellness-hover hover:border-amber-300 transition-all text-left group space-y-3">
-                <div className="p-3 rounded-2xl bg-amber-100 text-amber-800 w-fit group-hover:scale-110 transition-transform">
-                  <Plus className="w-6 h-6" />
+              <button onClick={() => setActiveSection('courses')} className="p-5 rounded-3xl bg-surface-white border border-surface-container-high shadow-wellness hover:shadow-wellness-hover hover:border-purple-300 transition-all text-left group space-y-2.5">
+                <div className="p-2.5 rounded-2xl bg-purple-100 text-purple-800 w-fit group-hover:scale-110 transition-transform">
+                  <BookOpen className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-bold text-text-main">Add Certificate</div>
-                  <div className="text-xs text-outline mt-0.5 font-medium">Upload & verify NOS</div>
+                  <div className="text-xs font-bold text-text-main">Browse Courses</div>
+                  <div className="text-[11px] text-outline mt-0.5 font-medium">{COURSES.length} HSSC courses</div>
+                </div>
+              </button>
+              <button onClick={() => setIsAddCertOpen(true)} className="p-5 rounded-3xl bg-surface-white border border-surface-container-high shadow-wellness hover:shadow-wellness-hover hover:border-amber-300 transition-all text-left group space-y-2.5">
+                <div className="p-2.5 rounded-2xl bg-amber-100 text-amber-800 w-fit group-hover:scale-110 transition-transform">
+                  <Plus className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-text-main">Add Certificate</div>
+                  <div className="text-[11px] text-outline mt-0.5 font-medium">Upload & verify NOS</div>
                 </div>
               </button>
             </div>
