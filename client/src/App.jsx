@@ -123,7 +123,19 @@ class ErrorBoundary extends React.Component {
 
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState(() => {
+    try {
+      const savedRole = localStorage.getItem('ayush_role');
+      const savedUser = localStorage.getItem('ayush_user');
+      if (savedUser && savedRole) {
+        if (savedRole === 'student') return 'student';
+        if (savedRole === 'recruiter') return 'placement';
+        if (savedRole === 'faculty') return 'faculty';
+        if (savedRole === 'institution') return 'institution';
+      }
+    } catch {}
+    return 'home';
+  });
   const [activeRole, setActiveRole] = useState(() => {
     try { return localStorage.getItem('ayush_role') || 'student'; } catch { return 'student'; }
   });
