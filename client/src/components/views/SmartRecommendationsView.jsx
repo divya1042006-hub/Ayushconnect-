@@ -183,9 +183,7 @@ export default function SmartRecommendationsView({ user }) {
   ]);
   const [activePreset, setActivePreset] = useState(null);
   const [newPresetName, setNewPresetName] = useState('');
-  const [progress, setProgress] = useState({
-    c1: 35, c2: 70, c3: 0, c4: 20, c5: 0, c6: 55,
-  });
+  const [progress, setProgress] = useState({});
 
   const showToast = (msg) => {
     setToastMsg(msg);
@@ -212,60 +210,42 @@ export default function SmartRecommendationsView({ user }) {
   const [isUploadingResume, setIsUploadingResume] = useState(false);
   const [resumeFileName, setResumeFileName] = useState('');
 
-  // ── AI Engine: derive skill gaps from user profile or parsed resume ──────
-  const defaultBaseSkills = [
-    { name: 'Panchakarma Procedure Execution', score: 55, target: 90, status: 'gap' },
-    { name: 'Abhyanga & Swedana', score: 78, target: 90, status: 'developing' },
-    { name: 'Patient Vital Signs Monitoring', score: 88, target: 90, status: 'strong' },
-    { name: 'Ayurvedic Herbal Kashaya Preparation', score: 60, target: 90, status: 'developing' },
-    { name: 'Sterilization & Aseptic Technique', score: 45, target: 90, status: 'gap' },
+  const hasResume = Boolean(resumeParsedSkills);
+
+  const defaultUnassessedSkills = [
+    { name: 'Panchakarma Procedure Execution', score: 0, target: 90, status: 'unassessed' },
+    { name: 'Abhyanga & Swedana Technique', score: 0, target: 90, status: 'unassessed' },
+    { name: 'Patient Vital Signs & Logging', score: 0, target: 90, status: 'unassessed' },
+    { name: 'Ayurvedic Herbal Kashaya Prep', score: 0, target: 90, status: 'unassessed' },
+    { name: 'Sterilization & Aseptic Technique', score: 0, target: 90, status: 'unassessed' },
   ];
 
-  const rawSkills = user?.skills;
-  let parsedSkills = null;
-  if (resumeParsedSkills) {
-    parsedSkills = resumeParsedSkills;
-  } else if (Array.isArray(rawSkills) && rawSkills.length > 0) {
-    parsedSkills = rawSkills.map(s => {
-      if (typeof s === 'string') return { name: s, score: 75, target: 90, status: 'developing' };
-      return {
-        name: s?.name || 'Ayush Competency',
-        score: typeof s?.score === 'number' ? s.score : 75,
-        target: typeof s?.target === 'number' ? s.target : 90,
-        status: s?.status || (s?.score >= 80 ? 'strong' : s?.score >= 60 ? 'developing' : 'gap')
-      };
-    });
-  } else if (typeof rawSkills === 'string') {
-    try {
-      const p = JSON.parse(rawSkills);
-      if (Array.isArray(p) && p.length > 0) {
-        parsedSkills = p.map(s => typeof s === 'string' ? { name: s, score: 75, target: 90, status: 'developing' } : s);
-      }
-    } catch (_) {}
-  }
+  const studentSkills = hasResume ? resumeParsedSkills : defaultUnassessedSkills;
 
-  const studentSkills = (parsedSkills && parsedSkills.length > 0) ? parsedSkills : defaultBaseSkills;
-
-  const gapSkills = studentSkills.filter(s => s && s.status === 'gap').map(s => s.name);
-  const developingSkills = studentSkills.filter(s => s && s.status === 'developing').map(s => s.name);
+  const gapSkills = hasResume ? studentSkills.filter(s => s && s.status === 'gap').map(s => s.name) : [];
+  const developingSkills = hasResume ? studentSkills.filter(s => s && s.status === 'developing').map(s => s.name) : [];
+  const strongSkills = hasResume ? studentSkills.filter(s => s && s.status === 'strong').map(s => s.name) : [];
   const allWeakSkills = [...gapSkills, ...developingSkills];
 
   // AI-ranked courses: courses that fix gaps rank highest
   const rankedCourses = useMemo(() => {
     return COURSES_DB.map(c => {
-      const gapFix = c.fixesGaps?.filter(g => allWeakSkills.includes(g)).length || 0;
-      const aiScore = Math.min(99, 60 + gapFix * 18 + Math.floor(Math.random() * 5));
-      const urgency = c.fixesGaps?.some(g => gapSkills.includes(g)) ? 'Critical Gap Fix' :
+      const gapFix = hasResume ? (c.fixesGaps?.filter(g => allWeakSkills.includes(g)).length || 0) : 0;
+      const aiScore = hasResume ? Math.min(99, 65 + gapFix * 16) : 0;
+      const urgency = !hasResume ? 'Awaiting Resume' :
+                      c.fixesGaps?.some(g => gapSkills.includes(g)) ? 'Critical Gap Fix' :
                       c.fixesGaps?.some(g => developingSkills.includes(g)) ? 'Skill Booster' : 'Enrichment';
       return { ...c, aiScore, urgency };
     }).sort((a, b) => b.aiScore - a.aiScore);
-  }, [user, resumeParsedSkills]);
+  }, [hasResume, resumeParsedSkills]);
 
   const [programFilter, setProgramFilter] = useState('All');
   const [showAppTrackerModal, setShowAppTrackerModal] = useState(false);
 
   const completedCourseCount = Object.values(progress).filter(p => p === 100).length;
-  const liveReadinessScore = Math.min(98, Math.max(68, 68 + completedCourseCount * 8 + Object.keys(enrolledCourses).length * 3));
+  const liveReadinessScore = hasResume
+    ? Math.min(98, Math.max(70, 70 + completedCourseCount * 8 + Object.keys(enrolledCourses).length * 3))
+    : 0;
 
   const handleQuickResumeUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -340,11 +320,11 @@ export default function SmartRecommendationsView({ user }) {
   const rankedInternships = useMemo(() => {
     return INTERNSHIPS_DB.filter(i => programFilter === 'All' || i.program === programFilter)
       .map(i => {
-        const matchScore = computeMatch(allWeakSkills, i.skills);
-        const overlap = i.skills.filter(s => studentSkills.some(ss => ss.name === s)).length;
+        const matchScore = hasResume ? computeMatch(allWeakSkills, i.skills) : 0;
+        const overlap = hasResume ? i.skills.filter(s => studentSkills.some(ss => ss.name === s && ss.status === 'strong')).length : 0;
         return { ...i, matchScore, overlap };
       }).sort((a, b) => b.matchScore - a.matchScore);
-  }, [user, programFilter, resumeParsedSkills]);
+  }, [hasResume, programFilter, resumeParsedSkills]);
 
   const [learningCourse, setLearningCourse] = useState(null);
 
@@ -526,41 +506,51 @@ export default function SmartRecommendationsView({ user }) {
               </div>
             </div>
             <div className="space-y-4">
-              {studentSkills.map((skill, i) => (
-                <div key={i} className="space-y-2">
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="flex items-center gap-2 text-sm text-text-main">
-                      {skill.status === 'strong' && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
-                      {skill.status === 'developing' && <Clock className="w-5 h-5 text-amber-500" />}
-                      {skill.status === 'gap' && <AlertCircle className="w-5 h-5 text-red-500" />}
-                      {skill.name}
-                    </span>
-                    <div className="flex items-center gap-3">
-                      <span className="text-outline">Target: {skill.target}%</span>
-                      <span className={`px-3 py-1 rounded-lg font-black text-xs ${
-                        skill.status === 'strong' ? 'bg-emerald-100 text-emerald-800' :
-                        skill.status === 'developing' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
-                      }`}>{skill.score}%</span>
-                    </div>
-                  </div>
-                  <div className="relative w-full h-3 bg-surface-container-low rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-700 ${
-                      skill.status === 'strong' ? 'bg-gradient-to-r from-emerald-500 to-primary' :
-                      skill.status === 'developing' ? 'bg-gradient-to-r from-amber-400 to-orange-500' :
-                      'bg-gradient-to-r from-red-400 to-red-600'
-                    }`} style={{ width: `${skill.score}%` }} />
-                    <div className="absolute top-0 h-full w-px bg-gray-400/60" style={{ left: `${skill.target}%` }} />
-                  </div>
-                  {skill.status !== 'strong' && (
-                    <div className="text-[11px] text-outline font-medium flex items-center gap-1">
-                      <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
-                      <span>AI suggests: <button onClick={() => setActiveSection('courses')} className="text-primary font-bold underline">
-                        {rankedCourses.find(c => c.fixesGaps?.includes(skill.name))?.title || 'Enroll in a targeted module'}
-                      </button></span>
-                    </div>
-                  )}
+              {!hasResume ? (
+                <div className="p-8 rounded-2xl bg-surface-container-low border border-dashed border-surface-container-high text-center space-y-3">
+                  <Brain className="w-10 h-10 text-outline mx-auto" />
+                  <div className="text-sm font-black text-text-main">No Resume Uploaded Yet (0% Initialized)</div>
+                  <p className="text-xs text-outline font-medium max-w-md mx-auto">
+                    Upload your resume in the panel above to calculate your live HSSC skill proficiencies and diagnostic gap percentages.
+                  </p>
                 </div>
-              ))}
+              ) : (
+                studentSkills.map((skill, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="flex items-center gap-2 text-sm text-text-main">
+                        {skill.status === 'strong' && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+                        {skill.status === 'developing' && <Clock className="w-5 h-5 text-amber-500" />}
+                        {skill.status === 'gap' && <AlertCircle className="w-5 h-5 text-red-500" />}
+                        {skill.name}
+                      </span>
+                      <div className="flex items-center gap-3">
+                        <span className="text-outline">Target: {skill.target}%</span>
+                        <span className={`px-3 py-1 rounded-lg font-black text-xs ${
+                          skill.status === 'strong' ? 'bg-emerald-100 text-emerald-800' :
+                          skill.status === 'developing' ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                        }`}>{skill.score}%</span>
+                      </div>
+                    </div>
+                    <div className="relative w-full h-3 bg-surface-container-low rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all duration-700 ${
+                        skill.status === 'strong' ? 'bg-gradient-to-r from-emerald-500 to-primary' :
+                        skill.status === 'developing' ? 'bg-gradient-to-r from-amber-400 to-orange-500' :
+                        'bg-gradient-to-r from-red-400 to-red-600'
+                      }`} style={{ width: `${skill.score}%` }} />
+                      <div className="absolute top-0 h-full w-px bg-gray-400/60" style={{ left: `${skill.target}%` }} />
+                    </div>
+                    {skill.status !== 'strong' && (
+                      <div className="text-[11px] text-outline font-medium flex items-center gap-1">
+                        <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                        <span>AI suggests: <button onClick={() => setActiveSection('courses')} className="text-primary font-bold underline">
+                          {rankedCourses.find(c => c.fixesGaps?.includes(skill.name))?.title || 'Enroll in a targeted module'}
+                        </button></span>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -569,14 +559,14 @@ export default function SmartRecommendationsView({ user }) {
             {[
               {
                 icon: <BookOpen className="w-6 h-6" />, color: 'bg-emerald-100 text-emerald-700',
-                title: 'Top Course Pick', badge: 'AI Recommended',
+                title: 'Top Course Pick', badge: hasResume ? 'AI Recommended' : 'Awaiting Resume',
                 content: rankedCourses[0]?.title,
                 sub: rankedCourses[0]?.provider,
                 action: () => setActiveSection('courses'), btnLabel: 'View Courses'
               },
               {
                 icon: <Briefcase className="w-6 h-6" />, color: 'bg-sky-100 text-sky-700',
-                title: 'Best Internship Match', badge: `${rankedInternships[0]?.matchScore}% Match`,
+                title: 'Best Internship Match', badge: hasResume ? `${rankedInternships[0]?.matchScore}% Match` : 'Awaiting Resume',
                 content: rankedInternships[0]?.title,
                 sub: rankedInternships[0]?.company + ' • ' + rankedInternships[0]?.location,
                 action: () => setActiveSection('internships'), btnLabel: 'View Matches'
@@ -615,7 +605,11 @@ export default function SmartRecommendationsView({ user }) {
             <h2 className="text-2xl font-black text-text-main flex items-center gap-3">
               <BookOpen className="w-7 h-7 text-primary" /> AI-Recommended Courses
             </h2>
-            <p className="text-sm text-outline font-medium mt-1">Ranked by how well they fix <strong className="text-red-600">{gapSkills.length} skill gaps</strong> in your profile</p>
+            <p className="text-sm text-outline font-medium mt-1">
+              {hasResume
+                ? <>Ranked by how well they fix <strong className="text-red-600">{gapSkills.length} skill gaps</strong> in your profile</>
+                : 'Upload resume above to calculate course alignment with your skill gaps (0% Initialized)'}
+            </p>
           </div>
 
           <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -632,7 +626,7 @@ export default function SmartRecommendationsView({ user }) {
                         'bg-white/20 border-white/30'
                       }`}>{course.urgency}</span>
                       <span className="text-[11px] font-extrabold px-3 py-1 rounded-full bg-white/20 border border-white/30">
-                        AI {course.aiScore}%
+                        {hasResume ? `AI ${course.aiScore}%` : 'Awaiting Resume'}
                       </span>
                     </div>
                     <h3 className="text-base font-black leading-snug">{course.title}</h3>
@@ -756,10 +750,13 @@ export default function SmartRecommendationsView({ user }) {
                 }`}>
                   <div className="flex items-center justify-between">
                     <span className={`text-[11px] font-extrabold px-3 py-1 rounded-full ${
+                      !hasResume ? 'bg-surface-container-high text-outline' :
                       intern.matchScore >= 85 ? 'bg-emerald-100 text-emerald-800' :
                       intern.matchScore >= 70 ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'
-                    }`}>{intern.matchScore}% AI Match</span>
-                    {intern.matchScore >= 85 && (
+                    }`}>
+                      {hasResume ? `${intern.matchScore}% AI Match` : 'Awaiting Resume'}
+                    </span>
+                    {hasResume && intern.matchScore >= 85 && (
                       <span className="text-[11px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1 border border-emerald-200">
                         <Sparkles className="w-3.5 h-3.5" /> Top Pick
                       </span>
@@ -796,7 +793,7 @@ export default function SmartRecommendationsView({ user }) {
                       })}
                     </div>
                     <div className="text-[11px] text-outline font-medium mt-2">
-                      {intern.overlap}/{intern.skills.length} skills matched ✓
+                      {hasResume ? `${intern.overlap}/${intern.skills.length} skills matched ✓` : `0/${intern.skills.length} skills (Upload Resume to match)`}
                     </div>
                   </div>
 
