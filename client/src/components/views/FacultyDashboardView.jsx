@@ -301,7 +301,7 @@ function StudentReviewCard({ std, onToast }) {
   );
 }
 
-export default function FacultyDashboardView() {
+export default function FacultyDashboardView({ user }) {
   const [activeSection, setActiveSection] = useState('overview');
   const [fdps, setFdps] = useState(FDPS);
   const [applyingId, setApplyingId] = useState(null);
@@ -416,13 +416,13 @@ export default function FacultyDashboardView() {
           <div className="space-y-3">
             <div className="flex items-center gap-3 flex-wrap">
               <span className="px-3 py-1 rounded-full bg-purple-200/20 text-purple-200 border border-purple-300/30 text-xs font-bold">
-                Dept of Shalya Tantra • AIIA New Delhi
+                {user?.department || 'Dept of Shalya Tantra'} • {user?.institution || 'AIIA New Delhi'}
               </span>
               <span className="text-xs text-white/80 font-medium">NCISM Verified Faculty</span>
             </div>
-            <h1 className="text-3xl md:text-4xl font-black tracking-tight">Prof. (Dr.) Rajeshwar Vaidya</h1>
+            <h1 className="text-3xl md:text-4xl font-black tracking-tight">{user?.name || 'Prof. (Dr.) Rajeshwar Vaidya'}</h1>
             <p className="text-sm text-white/90 font-medium">
-              Research Focus: <strong className="text-purple-200">Kshara Sutra Standardization & Clinical Trials</strong>
+              Research Focus: <strong className="text-purple-200">{user?.degree || user?.researchFocus || 'Kshara Sutra Standardization & Clinical Trials'}</strong>
             </p>
             <p className="text-xs text-white/60 font-medium max-w-xl">
               Discover <strong className="text-purple-200">Faculty Internships</strong>, <strong className="text-purple-200">Industrial Training</strong>, and <strong className="text-purple-200">FDPs</strong> — all in one portal to stay ahead of modern industry trends and enhance your research credentials.

@@ -233,8 +233,8 @@ export default function App() {
           {activeTab === 'recruiter' && <RecruiterDashboardView setActiveTab={setActiveTab} />}
           {activeTab === 'screening' && <ResumeScreeningView />}
           {activeTab === 'collaboration' && <CollaborationAnalyticsView />}
-          {activeTab === 'faculty' && <FacultyDashboardView />}
-          {activeTab === 'institution' && <InstitutionDashboardView />}
+          {activeTab === 'faculty' && <FacultyDashboardView user={user} />}
+          {activeTab === 'institution' && <InstitutionDashboardView user={user} />}
           {activeTab === 'help' && <HelpCentreView />}
         </ErrorBoundary>
       </main>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, GraduationCap, Briefcase, UserCheck, Building2, Lock, Mail, User, ShieldCheck, Sparkles, LogIn, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react';
 import { supabase } from '../../supabaseClient';
 import { API_BASE } from '../../api';
@@ -107,6 +107,12 @@ const LINKEDIN_PROFILES = {
 
 export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole = 'student' }) {
   const [activeRoleTab, setActiveRoleTab] = useState(initialRole);
+
+  useEffect(() => {
+    if (initialRole) {
+      setActiveRoleTab(initialRole);
+    }
+  }, [initialRole, isOpen]);
   const [isRegisterMode, setIsRegisterMode] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
