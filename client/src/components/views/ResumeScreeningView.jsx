@@ -1,9 +1,9 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   Sparkles, Upload, CheckCircle2, ShieldCheck, Cpu, RefreshCw, FileText,
   X, AlertCircle, TrendingUp, Target, BookOpen, Briefcase, ChevronRight,
   ExternalLink, Building2, Award, Zap, ArrowUpRight, BarChart3, Check,
-  Layers, UserCheck, AlertTriangle, ArrowRight, Bookmark, Compass
+  Layers, UserCheck, AlertTriangle, ArrowRight, Bookmark, Compass, Clock
 } from 'lucide-react';
 import { API_BASE } from '../../api';
 
@@ -80,6 +80,22 @@ Certifications:
 - Basic Anatomical & Physiological Terms (Ayurveda)`
   }
 };
+
+// 12 Standard HSSC National Occupational Standards (NOS) Benchmarks
+const ALL_NOS_BENCHMARKS = [
+  { name: 'Panchakarma Procedure Execution', category: 'Clinical Panchakarma', weight: 20 },
+  { name: 'Abhyanga & Swedana', category: 'Therapeutic Procedures', weight: 15 },
+  { name: 'Kati/Janu Basti Setup', category: 'Therapeutic Procedures', weight: 15 },
+  { name: 'Sterilization & Herbal Dravya Prep', category: 'Aseptic & Pharmacy', weight: 15 },
+  { name: 'Patient Vital Signs Monitoring', category: 'Diagnostics & Monitoring', weight: 10 },
+  { name: 'Ayurvedic Herbal Kashaya Preparation', category: 'Pharmacy & Formulations', weight: 15 },
+  { name: 'Clinical Documentation & Logging', category: 'Informatics & Ethics', weight: 10 },
+  { name: 'Tele-Ayurveda Protocols', category: 'Digital Health', weight: 10 },
+  { name: 'Therapeutic Yoga & Pranayama', category: 'Integrative Wellness', weight: 10 },
+  { name: 'Kshara Sutra Preparation & Standardization', category: 'Surgical Assistance', weight: 15 },
+  { name: 'Prakriti-Based Diet Planning', category: 'Dietetics & Nutrition', weight: 10 },
+  { name: 'GCP & Clinical Trial Protocols', category: 'Clinical Research', weight: 15 }
+];
 
 // AYUSH Industry Career Profiles
 const AYUSH_CAREER_ROLES_LOCAL = [
@@ -344,21 +360,6 @@ function parseResumeLocally(text) {
   if (certsSet.size === 0) certsSet.add('HSSC Panchakarma Attendant (Verified)');
   const detectedCertificates = Array.from(certsSet);
 
-  const ALL_NOS_BENCHMARKS = [
-    { name: 'Panchakarma Procedure Execution', category: 'Clinical Panchakarma', weight: 20 },
-    { name: 'Abhyanga & Swedana', category: 'Therapeutic Procedures', weight: 15 },
-    { name: 'Kati/Janu Basti Setup', category: 'Therapeutic Procedures', weight: 15 },
-    { name: 'Sterilization & Herbal Dravya Prep', category: 'Aseptic & Pharmacy', weight: 15 },
-    { name: 'Patient Vital Signs Monitoring', category: 'Diagnostics & Monitoring', weight: 10 },
-    { name: 'Ayurvedic Herbal Kashaya Preparation', category: 'Pharmacy & Formulations', weight: 15 },
-    { name: 'Clinical Documentation & Logging', category: 'Informatics & Ethics', weight: 10 },
-    { name: 'Tele-Ayurveda Protocols', category: 'Digital Health', weight: 10 },
-    { name: 'Therapeutic Yoga & Pranayama', category: 'Integrative Wellness', weight: 10 },
-    { name: 'Kshara Sutra Preparation & Standardization', category: 'Surgical Assistance', weight: 15 },
-    { name: 'Prakriti-Based Diet Planning', category: 'Dietetics & Nutrition', weight: 10 },
-    { name: 'GCP & Clinical Trial Protocols', category: 'Clinical Research', weight: 15 }
-  ];
-
   const skillGaps = ALL_NOS_BENCHMARKS.map(bench => {
     const isMastered = extractedSkills.includes(bench.name);
     let status = isMastered ? 'Mastered' : 'Gap';
@@ -461,7 +462,7 @@ function parseResumeLocally(text) {
 
 export default function ResumeScreeningView() {
   const [viewMode, setViewMode] = useState('student'); // 'student' | 'recruiter'
-  const [resumeText, setResumeText] = useState(SAMPLE_RESUMES.bams.text);
+  const [resumeText, setResumeText] = useState('');
   const [uploadedFile, setUploadedFile] = useState(null);
   const [parsing, setParsing] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -471,11 +472,6 @@ export default function ResumeScreeningView() {
   const [errorMsg, setErrorMsg] = useState('');
   const [activeTabFilter, setActiveTabFilter] = useState('all'); // 'all' | 'gaps' | 'mastered'
   const fileInputRef = useRef(null);
-
-  // Auto-run extraction on mount for instant visual delight
-  useEffect(() => {
-    handleParse();
-  }, []);
 
   const extractTextFromPdf = (file) => {
     return new Promise((resolve) => {
@@ -522,6 +518,8 @@ export default function ResumeScreeningView() {
     }
     const finalTxt = `[Uploaded File: ${file.name}]\n${extracted}`;
     setResumeText(finalTxt);
+    // Auto analyze newly uploaded file
+    executeParse(finalTxt);
   }, []);
 
   const handleFileInput = (e) => {
@@ -539,13 +537,15 @@ export default function ResumeScreeningView() {
 
   const loadSample = (key) => {
     setUploadedFile(null);
-    setResumeText(SAMPLE_RESUMES[key].text);
-    setParsedResult(null);
+    const txt = SAMPLE_RESUMES[key].text;
+    setResumeText(txt);
     setErrorMsg('');
+    executeParse(txt);
   };
 
-  const handleParse = async () => {
-    if (!resumeText.trim()) {
+  const executeParse = async (textToParse) => {
+    const text = textToParse !== undefined ? textToParse : resumeText;
+    if (!text || !text.trim()) {
       setErrorMsg('Please upload a resume or paste text first.');
       return;
     }
@@ -560,7 +560,7 @@ export default function ResumeScreeningView() {
       const res = await fetch(`${API_BASE}/api/ai/parse-resume`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ resumeText }),
+        body: JSON.stringify({ resumeText: text }),
         signal: controller.signal,
       });
       clearTimeout(timeout);
@@ -577,10 +577,13 @@ export default function ResumeScreeningView() {
       console.warn('Backend fetch failed, using local AI parser engine:', e.message);
     }
 
-    // Fallback: local engine guarantees 100% reliability
-    await new Promise(r => setTimeout(r, 600));
-    setParsedResult(parseResumeLocally(resumeText));
+    await new Promise(r => setTimeout(r, 500));
+    setParsedResult(parseResumeLocally(text));
     setParsing(false);
+  };
+
+  const handleParse = () => {
+    executeParse(resumeText);
   };
 
   const handleSyncToProfile = async () => {
@@ -627,9 +630,19 @@ export default function ResumeScreeningView() {
     setSyncing(false);
   };
 
-  const filteredGaps = (parsedResult?.skillGaps || []).filter(g => {
+  const displayGaps = parsedResult ? (parsedResult.skillGaps || []) : ALL_NOS_BENCHMARKS.map(b => ({
+    skill: b.name,
+    category: b.category,
+    status: 'Unassessed',
+    proficiencyScore: 0,
+    targetScore: 90,
+    urgency: 'Awaiting Upload',
+    isGap: false
+  }));
+
+  const filteredGaps = displayGaps.filter(g => {
     if (activeTabFilter === 'gaps') return g.isGap;
-    if (activeTabFilter === 'mastered') return !g.isGap;
+    if (activeTabFilter === 'mastered') return g.status === 'Mastered';
     return true;
   });
 
@@ -691,13 +704,13 @@ export default function ResumeScreeningView() {
 
           <button
             onClick={handleParse}
-            disabled={parsing}
+            disabled={parsing || !resumeText.trim()}
             className={`px-6 py-3.5 rounded-2xl text-white font-black text-xs transition-all shadow-wellness flex items-center justify-center gap-2.5 ${
-              parsing ? 'bg-primary/60 cursor-not-allowed' : 'bg-primary hover:bg-primary-container hover:scale-[1.02]'
+              parsing ? 'bg-primary/60 cursor-not-allowed' : !resumeText.trim() ? 'bg-outline/50 cursor-not-allowed' : 'bg-primary hover:bg-primary-container hover:scale-[1.02]'
             }`}
           >
             {parsing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 text-leaf-green-accent" />}
-            <span>{parsing ? 'Analyzing Resume...' : 'Re-Run AI Analysis'}</span>
+            <span>{parsing ? 'Analyzing Resume...' : 'Run AI Analysis'}</span>
           </button>
         </div>
       </div>
@@ -762,7 +775,8 @@ export default function ResumeScreeningView() {
                 <button
                   onClick={() => {
                     setUploadedFile(null);
-                    setResumeText(SAMPLE_RESUMES.bams.text);
+                    setResumeText('');
+                    setParsedResult(null);
                   }}
                   className="p-1.5 rounded-full text-emerald-700 hover:text-red-600 hover:bg-red-100 transition-all shrink-0"
                 >
@@ -796,7 +810,7 @@ export default function ResumeScreeningView() {
             {/* Quick Test Samples */}
             <div className="space-y-2 pt-2 border-t border-surface-container-high">
               <div className="text-[11px] font-extrabold text-outline uppercase tracking-wider">
-                Or Load Pre-built Ayush Profile Samples:
+                Or Test with Pre-built Ayush Profile Samples:
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(SAMPLE_RESUMES).map(([key, sample]) => (
@@ -817,27 +831,33 @@ export default function ResumeScreeningView() {
                 <label className="text-[11px] font-bold text-outline uppercase tracking-wider">
                   Resume Content & Skills:
                 </label>
-                <button
-                  onClick={() => setResumeText('')}
-                  className="text-[10px] font-bold text-red-600 hover:underline"
-                >
-                  Clear
-                </button>
+                {resumeText && (
+                  <button
+                    onClick={() => {
+                      setResumeText('');
+                      setParsedResult(null);
+                      setUploadedFile(null);
+                    }}
+                    className="text-[10px] font-bold text-red-600 hover:underline"
+                  >
+                    Clear
+                  </button>
+                )}
               </div>
               <textarea
                 rows={6}
                 value={resumeText}
                 onChange={(e) => setResumeText(e.target.value)}
                 className="w-full p-3.5 rounded-2xl bg-surface-container-low border border-surface-container-high text-xs text-text-main font-mono focus:outline-none focus:border-primary transition-all leading-relaxed"
-                placeholder="Paste resume text, degrees, clinical skills, and certifications..."
+                placeholder="Upload resume above or paste degrees, clinical skills, and certifications here to calculate live match %..."
               />
             </div>
 
             <button
               onClick={handleParse}
-              disabled={parsing}
+              disabled={parsing || !resumeText.trim()}
               className={`w-full py-3.5 rounded-2xl text-white font-black text-xs transition-all flex items-center justify-center gap-2 shadow-md ${
-                parsing ? 'bg-primary/60 cursor-not-allowed' : 'bg-primary hover:bg-primary-container'
+                parsing ? 'bg-primary/60 cursor-not-allowed' : !resumeText.trim() ? 'bg-outline/40 cursor-not-allowed' : 'bg-primary hover:bg-primary-container'
               }`}
             >
               {parsing ? (
@@ -848,29 +868,38 @@ export default function ResumeScreeningView() {
               ) : (
                 <>
                   <Cpu className="w-4 h-4 text-leaf-green-accent" />
-                  <span>Run Skill Gap & Role Mapping Diagnostic</span>
+                  <span>{resumeText.trim() ? 'Run Skill Gap & Role Mapping Diagnostic' : 'Upload Resume / Pick Sample to Analyze'}</span>
                 </>
               )}
             </button>
           </div>
 
           {/* Quick Profile Summary Card */}
-          {parsedResult && (
-            <div className="bg-surface-white rounded-3xl p-6 border border-surface-container-high shadow-wellness space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-outline">Candidate Overview</span>
-                <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-leaf-green-light text-primary border border-leaf-green-accent/30">
-                  AI Confidence {parsedResult.aiConfidenceScore}
-                </span>
-              </div>
+          <div className="bg-surface-white rounded-3xl p-6 border border-surface-container-high shadow-wellness space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-black uppercase tracking-wider text-outline">Candidate Overview</span>
+              <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${
+                parsedResult ? 'bg-leaf-green-light text-primary border border-leaf-green-accent/30' : 'bg-surface-container-high text-outline'
+              }`}>
+                {parsedResult ? `AI Confidence ${parsedResult.aiConfidenceScore}` : 'Awaiting Resume'}
+              </span>
+            </div>
 
+            {parsedResult ? (
               <div className="space-y-1">
                 <h3 className="text-lg font-black text-primary">{parsedResult.candidateName}</h3>
                 <p className="text-xs font-bold text-text-main">{parsedResult.degree}</p>
                 <p className="text-[11px] text-outline font-medium">{parsedResult.college}</p>
               </div>
+            ) : (
+              <div className="p-4 rounded-2xl bg-surface-container-low border border-dashed border-surface-container-high text-center space-y-1">
+                <div className="text-xs font-bold text-text-main">No Resume Analyzed Yet</div>
+                <div className="text-[11px] text-outline font-medium">Upload a file or choose a sample to extract credentials</div>
+              </div>
+            )}
 
-              {/* Verified Certificates */}
+            {/* Verified Certificates */}
+            {parsedResult && (
               <div className="space-y-2 pt-2 border-t border-surface-container-high">
                 <div className="text-[11px] font-bold text-outline uppercase tracking-wider">Detected Credentials:</div>
                 <div className="flex flex-wrap gap-1.5">
@@ -882,8 +911,10 @@ export default function ResumeScreeningView() {
                   ))}
                 </div>
               </div>
+            )}
 
-              {/* Sync Profile Action */}
+            {/* Sync Profile Action */}
+            {parsedResult && (
               <button
                 onClick={handleSyncToProfile}
                 disabled={syncing}
@@ -892,8 +923,8 @@ export default function ResumeScreeningView() {
                 {syncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4 text-emerald-600" />}
                 <span>Sync Verified Skills & Readiness to Profile</span>
               </button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Right Column: AI Diagnostics, Skill Gap Breakdown & Career Role Mapping (7 cols) */}
@@ -909,7 +940,7 @@ export default function ResumeScreeningView() {
                   HSSC Qualification Readiness Analysis
                 </span>
                 <h3 className="text-2xl font-black text-white mt-1">
-                  {parsedResult ? `${parsedResult.overallReadinessScore}% Aggregate Job Fit` : 'Analyzing Profile...'}
+                  {parsedResult ? `${parsedResult.overallReadinessScore}% Aggregate Job Fit` : '0% (Awaiting Resume Upload)'}
                 </h3>
               </div>
 
@@ -917,14 +948,14 @@ export default function ResumeScreeningView() {
                 <div className="text-right">
                   <div className="text-xs text-white/70 font-medium">Mastered NOS Skills</div>
                   <div className="text-xl font-black text-leaf-green-accent">
-                    {parsedResult?.masteredCount || 0} / 12
+                    {parsedResult ? parsedResult.masteredCount : 0} / 12
                   </div>
                 </div>
                 <div className="w-px h-10 bg-white/20"></div>
                 <div className="text-right">
                   <div className="text-xs text-white/70 font-medium">Critical Gaps</div>
                   <div className="text-xl font-black text-amber-300">
-                    {parsedResult?.gapCount || 0}
+                    {parsedResult ? parsedResult.gapCount : 0}
                   </div>
                 </div>
               </div>
@@ -935,11 +966,11 @@ export default function ResumeScreeningView() {
               <div className="w-full bg-white/20 rounded-full h-3 overflow-hidden p-0.5">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-leaf-green-accent transition-all duration-700"
-                  style={{ width: `${parsedResult?.overallReadinessScore || 65}%` }}
+                  style={{ width: `${parsedResult ? parsedResult.overallReadinessScore : 0}%` }}
                 ></div>
               </div>
               <div className="flex justify-between text-[11px] text-white/80 font-bold">
-                <span>Foundation (0-59%)</span>
+                <span>0% (Upload Resume)</span>
                 <span>Developing (60-79%)</span>
                 <span className="text-leaf-green-accent font-black">HSSC Certified Ready (80-100%)</span>
               </div>
@@ -955,7 +986,7 @@ export default function ResumeScreeningView() {
                   <span>HSSC NOS Skill Gap Diagnostics</span>
                 </h3>
                 <p className="text-xs text-outline font-medium">
-                  Verified against Ayush Sub-SSC National Occupational Standards
+                  {parsedResult ? 'Verified against Ayush Sub-SSC National Occupational Standards' : 'Upload a resume to evaluate 12 core clinical competencies'}
                 </p>
               </div>
 
@@ -994,7 +1025,9 @@ export default function ResumeScreeningView() {
                 <div
                   key={idx}
                   className={`p-4 rounded-2xl border transition-all ${
-                    item.isGap
+                    !parsedResult
+                      ? 'border-surface-container-high bg-surface-container-lowest opacity-75'
+                      : item.isGap
                       ? item.urgency === 'Critical'
                         ? 'border-amber-200 bg-amber-50/40'
                         : 'border-surface-container-high bg-surface-container-lowest'
@@ -1004,9 +1037,13 @@ export default function ResumeScreeningView() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`p-2 rounded-xl shrink-0 ${
-                        item.isGap ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-700'
+                        !parsedResult
+                          ? 'bg-surface-container-high text-outline'
+                          : item.isGap
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-emerald-100 text-emerald-700'
                       }`}>
-                        {item.isGap ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                        {!parsedResult ? <Clock className="w-4 h-4" /> : item.isGap ? <AlertTriangle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                       </div>
                       <div className="min-w-0">
                         <div className="text-xs font-black text-text-main truncate">{item.skill}</div>
@@ -1020,13 +1057,15 @@ export default function ResumeScreeningView() {
                         <div className="text-[10px] text-outline">Proficiency</div>
                       </div>
                       <span className={`text-[11px] font-black px-2.5 py-1 rounded-full ${
-                        item.isGap
+                        !parsedResult
+                          ? 'bg-surface-container-high text-outline'
+                          : item.isGap
                           ? item.urgency === 'Critical'
                             ? 'bg-amber-200 text-amber-900 border border-amber-300'
                             : 'bg-surface-container-high text-outline'
                           : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
                       }`}>
-                        {item.isGap ? `${item.urgency} Gap` : 'Mastered'}
+                        {!parsedResult ? 'Awaiting Resume' : item.isGap ? `${item.urgency} Gap` : 'Mastered'}
                       </span>
                     </div>
                   </div>
@@ -1035,7 +1074,7 @@ export default function ResumeScreeningView() {
                   <div className="mt-3 w-full bg-surface-container-high rounded-full h-1.5 overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${
-                        item.isGap ? 'bg-amber-500' : 'bg-emerald-600'
+                        !parsedResult ? 'bg-outline/20' : item.isGap ? 'bg-amber-500' : 'bg-emerald-600'
                       }`}
                       style={{ width: `${item.proficiencyScore}%` }}
                     ></div>
@@ -1054,87 +1093,102 @@ export default function ResumeScreeningView() {
                   <span>AYUSH Career & Job Role Mapping</span>
                 </h3>
                 <p className="text-xs text-outline font-medium">
-                  Match score computed from your extracted competencies & certificates
+                  {parsedResult ? 'Match score calculated from your extracted resume competencies' : 'Upload resume to calculate percentage fit across 6 career tracks'}
                 </p>
               </div>
-              <span className="text-xs font-black text-primary bg-leaf-green-light px-3 py-1 rounded-full border border-leaf-green-accent/30">
-                6 Roles Evaluated
+              <span className={`text-xs font-black px-3 py-1 rounded-full border ${
+                parsedResult ? 'text-primary bg-leaf-green-light border-leaf-green-accent/30' : 'text-outline bg-surface-container-low border-surface-container-high'
+              }`}>
+                {parsedResult ? '6 Roles Evaluated' : '0% Initialized'}
               </span>
             </div>
 
             {/* Role Cards Grid */}
             <div className="grid sm:grid-cols-2 gap-4">
-              {(parsedResult?.roleMappings || AYUSH_CAREER_ROLES_LOCAL).map((role) => (
-                <div
-                  key={role.id}
-                  className="p-5 rounded-2xl border border-surface-container-high bg-surface-container-lowest hover:border-primary hover:shadow-md transition-all space-y-3.5 flex flex-col justify-between"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-outline">
-                        {role.sector}
-                      </span>
-                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
-                        role.matchPercent >= 80
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : role.matchPercent >= 60
-                          ? 'bg-sky-100 text-sky-800'
-                          : 'bg-amber-100 text-amber-800'
-                      }`}>
-                        {role.fitLevel}
-                      </span>
+              {(parsedResult?.roleMappings || AYUSH_CAREER_ROLES_LOCAL).map((role) => {
+                const matchPct = parsedResult ? role.matchPercent : 0;
+                const fitBadge = parsedResult ? role.fitLevel : 'Awaiting Resume';
+
+                return (
+                  <div
+                    key={role.id}
+                    className="p-5 rounded-2xl border border-surface-container-high bg-surface-container-lowest hover:border-primary hover:shadow-md transition-all space-y-3.5 flex flex-col justify-between"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-outline">
+                          {role.sector}
+                        </span>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                          !parsedResult
+                            ? 'bg-surface-container-high text-outline'
+                            : matchPct >= 80
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : matchPct >= 60
+                            ? 'bg-sky-100 text-sky-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}>
+                          {fitBadge}
+                        </span>
+                      </div>
+
+                      <h4 className="text-sm font-black text-text-main">{role.title}</h4>
+                      <p className="text-[11px] text-outline font-medium">{role.qualificationPack}</p>
                     </div>
 
-                    <h4 className="text-sm font-black text-text-main">{role.title}</h4>
-                    <p className="text-[11px] text-outline font-medium">{role.qualificationPack}</p>
-                  </div>
-
-                  {/* Match Meter */}
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs font-black">
-                      <span className="text-outline">Role Match</span>
-                      <span className="text-primary">{role.matchPercent}%</span>
-                    </div>
-                    <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
-                      <div
-                        className={`h-full rounded-full transition-all ${
-                          role.matchPercent >= 80
-                            ? 'bg-emerald-600'
-                            : role.matchPercent >= 60
-                            ? 'bg-sky-600'
-                            : 'bg-amber-500'
-                        }`}
-                        style={{ width: `${role.matchPercent}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Missing Competencies */}
-                  {role.missingSkills && role.missingSkills.length > 0 && (
+                    {/* Match Meter */}
                     <div className="space-y-1">
-                      <div className="text-[10px] font-extrabold text-outline uppercase">Missing Prerequisites:</div>
-                      <div className="flex flex-wrap gap-1">
-                        {role.missingSkills.slice(0, 2).map((m, i) => (
-                          <span key={i} className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 truncate max-w-full">
-                            + {m}
-                          </span>
-                        ))}
-                        {role.missingSkills.length > 2 && (
-                          <span className="text-[10px] font-bold text-outline self-center">
-                            +{role.missingSkills.length - 2} more
-                          </span>
-                        )}
+                      <div className="flex justify-between text-xs font-black">
+                        <span className="text-outline">Role Match</span>
+                        <span className={parsedResult ? 'text-primary' : 'text-outline'}>{matchPct}%</span>
+                      </div>
+                      <div className="w-full bg-surface-container-high rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            !parsedResult
+                              ? 'bg-outline/20'
+                              : matchPct >= 80
+                              ? 'bg-emerald-600'
+                              : matchPct >= 60
+                              ? 'bg-sky-600'
+                              : 'bg-amber-500'
+                          }`}
+                          style={{ width: `${matchPct}%` }}
+                        ></div>
                       </div>
                     </div>
-                  )}
 
-                  {/* Salary & Openings */}
-                  <div className="pt-2 border-t border-surface-container-high flex items-center justify-between text-[11px] text-outline font-bold">
-                    <span>Est: <strong className="text-text-main">{role.avgSalary}</strong></span>
-                    <span className="text-emerald-700 font-extrabold">{role.openings} Openings</span>
+                    {/* Missing Competencies */}
+                    {parsedResult && role.missingSkills && role.missingSkills.length > 0 ? (
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-extrabold text-outline uppercase">Missing Prerequisites:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {role.missingSkills.slice(0, 2).map((m, i) => (
+                            <span key={i} className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-900 border border-amber-200 truncate max-w-full">
+                              + {m}
+                            </span>
+                          ))}
+                          {role.missingSkills.length > 2 && (
+                            <span className="text-[10px] font-bold text-outline self-center">
+                              +{role.missingSkills.length - 2} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-outline font-medium italic">
+                        Upload resume to detect matching competencies
+                      </div>
+                    )}
+
+                    {/* Salary & Openings */}
+                    <div className="pt-2 border-t border-surface-container-high flex items-center justify-between text-[11px] text-outline font-bold">
+                      <span>Est: <strong className="text-text-main">{role.avgSalary}</strong></span>
+                      <span className="text-emerald-700 font-extrabold">{role.openings} Openings</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -1150,39 +1204,49 @@ export default function ResumeScreeningView() {
               </p>
             </div>
 
-            <div className="space-y-3">
-              {(parsedResult?.bridgeRecommendations || []).map((bridge, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-2xl border border-surface-container-high bg-surface-container-lowest hover:border-primary transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black">
-                        {bridge.platform}
-                      </span>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                        {bridge.boostEstimate}
-                      </span>
-                    </div>
-                    <h4 className="text-xs font-black text-text-main">{bridge.title}</h4>
-                    <p className="text-[11px] text-outline font-medium">
-                      Addresses: {bridge.addressesGaps.join(', ')} • {bridge.duration}
-                    </p>
-                  </div>
-
-                  <a
-                    href={bridge.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-black hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs"
+            {parsedResult && (parsedResult.bridgeRecommendations || []).length > 0 ? (
+              <div className="space-y-3">
+                {parsedResult.bridgeRecommendations.map((bridge, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-2xl border border-surface-container-high bg-surface-container-lowest hover:border-primary transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                   >
-                    <span>Enroll Now</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </a>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 text-[10px] font-black">
+                          {bridge.platform}
+                        </span>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          {bridge.boostEstimate}
+                        </span>
+                      </div>
+                      <h4 className="text-xs font-black text-text-main">{bridge.title}</h4>
+                      <p className="text-[11px] text-outline font-medium">
+                        Addresses: {bridge.addressesGaps.join(', ')} • {bridge.duration}
+                      </p>
+                    </div>
+
+                    <a
+                      href={bridge.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-black hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs"
+                    >
+                      <span>Enroll Now</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-6 rounded-2xl bg-surface-container-low border border-dashed border-surface-container-high text-center space-y-2">
+                <BookOpen className="w-8 h-8 text-outline mx-auto" />
+                <div className="text-xs font-bold text-text-main">No Skill Gaps Detected Yet</div>
+                <div className="text-[11px] text-outline font-medium">
+                  Upload your resume above or choose a pre-built profile to generate targeted bridge courses.
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
           </div>
 
         </div>
