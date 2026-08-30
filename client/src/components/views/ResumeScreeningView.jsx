@@ -4,8 +4,9 @@ import {
   X, AlertCircle, TrendingUp, Target, BookOpen, Briefcase, ChevronRight,
   ExternalLink, Building2, Award, Zap, ArrowUpRight, BarChart3, Check,
   Layers, UserCheck, AlertTriangle, ArrowRight, Bookmark, Compass, Clock,
-  Send, MapPin, Building, Star
+  Send, MapPin, Building, Star, Play
 } from 'lucide-react';
+import CourseLearningModal from '../common/CourseLearningModal';
 import { API_BASE } from '../../api';
 
 // Preloaded realistic sample resumes for 1-click test
@@ -619,6 +620,7 @@ export default function ResumeScreeningView() {
   const [selectedRoleForModal, setSelectedRoleForModal] = useState(null);
   const [showJobModal, setShowJobModal] = useState(false);
   const [applyToastMsg, setApplyToastMsg] = useState('');
+  const [bridgeLearningCourse, setBridgeLearningCourse] = useState(null);
   const fileInputRef = useRef(null);
 
   const handleApplyToJob = async (role, job) => {
@@ -1462,15 +1464,31 @@ export default function ResumeScreeningView() {
                       </p>
                     </div>
 
-                    <a
-                      href={bridge.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-black hover:bg-primary-container transition-all flex items-center justify-center gap-1.5 shrink-0 shadow-xs"
-                    >
-                      <span>Enroll Now</span>
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => setBridgeLearningCourse({
+                          id: idx === 0 ? 'c1' : idx === 1 ? 'c2' : idx === 2 ? 'c4' : 'c3',
+                          title: bridge.title,
+                          provider: bridge.provider || 'Ministry of AYUSH LMS',
+                          qualificationPack: 'HSSC Bridge Learning Module',
+                          duration: bridge.duration
+                        })}
+                        className="px-4 py-2 rounded-xl bg-leaf-green-light hover:bg-leaf-green-light/80 text-primary border border-leaf-green-accent/40 text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-2xs"
+                      >
+                        <Play className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Watch Demo & Take Quiz</span>
+                      </button>
+
+                      <a
+                        href={bridge.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-2 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-outline hover:text-text-main text-xs font-bold transition-all flex items-center justify-center gap-1"
+                      >
+                        <span>Portal</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1610,6 +1628,17 @@ export default function ResumeScreeningView() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Bridge Course Video Lecture & Skill Assessment Modal */}
+      {bridgeLearningCourse && (
+        <CourseLearningModal
+          course={bridgeLearningCourse}
+          onClose={() => setBridgeLearningCourse(null)}
+          onCompleteCourse={(courseId, score) => {
+            setApplyToastMsg(`🏆 Bridge Course Skill Assessment passed with ${score}%! NOS proficiency updated.`);
+          }}
+        />
       )}
     </div>
   );

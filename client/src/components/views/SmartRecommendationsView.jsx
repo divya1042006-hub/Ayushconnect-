@@ -6,6 +6,7 @@ import {
   MapPin, Gift, ArrowUpRight, Lightbulb, Bot, BarChart3, LayoutDashboard,
   QrCode, Share2, Bookmark, Copy, ExternalLink, X, Filter, Upload, FileText, Compass, Check
 } from 'lucide-react';
+import CourseLearningModal from '../common/CourseLearningModal';
 
 // ── AI Matching Engine ──────────────────────────────────────────────────────
 // Computes relevance score between student's skill gaps and course/internship
@@ -345,10 +346,20 @@ export default function SmartRecommendationsView({ user }) {
       }).sort((a, b) => b.matchScore - a.matchScore);
   }, [user, programFilter, resumeParsedSkills]);
 
+  const [learningCourse, setLearningCourse] = useState(null);
+
   const handleEnroll = (courseId) => {
+    const targetCourse = COURSES_DB.find(c => c.id === courseId) || { id: courseId, title: 'AYUSH Clinical Certification Module' };
     setEnrolledCourses(prev => ({ ...prev, [courseId]: true }));
-    setProgress(prev => ({ ...prev, [courseId]: prev[courseId] || 0 }));
-    showToast('🎓 Enrolled! Your progress is now being tracked.');
+    setProgress(prev => ({ ...prev, [courseId]: prev[courseId] || 25 }));
+    setLearningCourse(targetCourse);
+    showToast('🎓 Enrolled! Video lecture demo & Skill Assessment quiz opened.');
+  };
+
+  const handleCompleteCourse = (courseId, score) => {
+    setProgress(prev => ({ ...prev, [courseId]: 100 }));
+    setEnrolledCourses(prev => ({ ...prev, [courseId]: true }));
+    showToast(`🏆 Assessment passed with ${score}%! Verified to student profile.`);
   };
 
   const handleApplyInternship = async (intern) => {
@@ -1189,6 +1200,15 @@ export default function SmartRecommendationsView({ user }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Course Video Lecture & Skill Assessment Modal */}
+      {learningCourse && (
+        <CourseLearningModal
+          course={learningCourse}
+          onClose={() => setLearningCourse(null)}
+          onCompleteCourse={handleCompleteCourse}
+        />
       )}
     </div>
   );

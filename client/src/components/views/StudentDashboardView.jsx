@@ -6,6 +6,7 @@ import {
   FileText, Cpu
 } from 'lucide-react';
 import AddCertificateModal from '../common/AddCertificateModal';
+import CourseLearningModal from '../common/CourseLearningModal';
 import { API_BASE } from '../../api';
 
 // ─── Static Courses Data ────────────────────────────────────────────────────
@@ -240,9 +241,18 @@ export default function StudentDashboardView({ user, setActiveTab }) {
     showToast(`🎉 Applied to "${intern.title}" at ${intern.company}!`);
   };
 
+  const [learningCourse, setLearningCourse] = useState(null);
+
   const handleEnrollCourse = (courseId) => {
+    const target = COURSES.find(c => c.id === courseId) || { id: courseId, title: 'AYUSH Certification Module' };
     setEnrolledCourses(prev => ({ ...prev, [courseId]: true }));
-    showToast('🎓 Enrolled! Check your learning dashboard.');
+    setLearningCourse(target);
+    showToast('🎓 Enrolled! Video lecture demo & Skill Assessment quiz opened.');
+  };
+
+  const handleCompleteCourse = (courseId, score) => {
+    setEnrolledCourses(prev => ({ ...prev, [courseId]: true }));
+    showToast(`🏆 Skill Assessment passed with ${score}%! Verified to student profile.`);
   };
 
   const handleCertificateAdded = (newCert) => {
@@ -765,6 +775,15 @@ export default function StudentDashboardView({ user, setActiveTab }) {
         onCertificateAdded={handleCertificateAdded}
         user={user}
       />
+
+      {/* Course Video Lecture & Skill Assessment Modal */}
+      {learningCourse && (
+        <CourseLearningModal
+          course={learningCourse}
+          onClose={() => setLearningCourse(null)}
+          onCompleteCourse={handleCompleteCourse}
+        />
+      )}
     </div>
   );
 }
