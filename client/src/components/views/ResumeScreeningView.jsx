@@ -11,6 +11,36 @@ import { API_BASE } from '../../api';
 
 // Preloaded realistic sample resumes for 1-click test
 const SAMPLE_RESUMES = {
+  ats_bams: {
+    label: '⭐ ATS BAMS Intern (Dr. Ayushman)',
+    text: `DR. AYUSHMAN SHARMA
+BAMS Student & Clinical Intern
+Phone: +91 98765 43210 | Email: ayushman.sharma@ayush.edu.in
+Location: Jaipur, Rajasthan | Degree: Bachelor of Ayurvedic Medicine and Surgery (BAMS)
+
+PROFESSIONAL SUMMARY:
+Dedicated BAMS final-year student with strong foundations in Ayurvedic diagnosis, Dravyaguna pharmacology, and classical Panchakarma protocols. Experienced in assisting OPD/IPD consultations, vital signs monitoring, and Prakriti-based lifestyle counseling. Seeking an Ayurveda internship to apply holistic healthcare principles.
+
+EDUCATION:
+Bachelor of Ayurvedic Medicine and Surgery (BAMS)
+National Institute of Ayurveda (NIA), Jaipur (2021 - 2026 Expected)
+Aggregate Score: 78.4% | Academic Distinction in Dravyaguna Vijnana & Kayachikitsa
+
+CLINICAL COMPETENCIES & AYURVEDIC SKILLS:
+- Diagnostic: Nadi Pariksha, Rogi & Roga Pariksha, Prakriti Assessment, Patient Vital Signs Monitoring
+- Panchakarma & Therapeutics: Panchakarma Procedure Execution, Abhyanga & Swedana Technique, Kati Basti & Janu Basti Setup
+- Pharmacy & Standardization: Ayurvedic Herbal Kashaya Preparation, Sterilization & Herbal Dravya Prep
+- Informatics: Clinical Documentation & Logging in EHR, Tele-Ayurveda Protocols
+
+HOSPITAL TRAINING & CLINICAL EXPOSURE:
+- Clinical Trainee (Kayachikitsa & Panchakarma OPD/IPD), NIA Hospital: Assisted senior Vaidyas in history taking and vitals monitoring for 40+ patients daily.
+- Assisted in autoclaving, OT sterilization, and Kshara Sutra medicated thread preparation.
+
+CERTIFICATIONS & ACCREDITATIONS:
+- HSSC Panchakarma Attendant (Verified 2025)
+- Red Cross First Aid & CPR Basic Life Support (2025)
+- WHO-GMP Ayush Manufacturing Standard (Verified)`
+  },
   bams: {
     label: 'BAMS Clinical Intern (Panchakarma)',
     text: `Dr. Ananya Sharma
