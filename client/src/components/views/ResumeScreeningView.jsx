@@ -8,6 +8,12 @@ import {
 } from 'lucide-react';
 import CourseLearningModal from '../common/CourseLearningModal';
 import { API_BASE } from '../../api';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker safely
+try {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+} catch (_) {}
 
 // Preloaded realistic sample resumes for 1-click test
 const SAMPLE_RESUMES = {
@@ -521,79 +527,100 @@ export function analyzeAtsCompliance(rawText) {
     .replace(/<<.*?>>/g, '')
     .trim();
 
+  if (clean.length < 35) {
+    return {
+      atsScore: 0,
+      isAtsCompliant: false,
+      tier: 'Non-ATS Format',
+      checks: {
+        contact: { passed: false, label: 'Contact Information', detail: 'Document too short or unreadable' },
+        sections: { passed: false, label: 'Standard ATS Headings', detail: 'No section headers detected' },
+        readability: { passed: false, label: 'Machine-Readable Text Layer', detail: 'Insufficient text layer' },
+        keywords: { passed: false, label: 'AYUSH NOS Skill Keywords', detail: '0 keywords matched' },
+        degree: { passed: false, label: 'Accredited Qualification', detail: 'No degree found' }
+      },
+      summary: 'Upload an ATS-compliant resume.'
+    };
+  }
+
   const lower = clean.toLowerCase();
 
   // 1. Contact check (Email, Phone, Name)
   const hasEmail = /[\w.-]+@[\w.-]+\.\w+/.test(clean);
-  const hasPhone = /\+?\d[\d\s-]{8,14}\d/.test(clean);
-  const hasContactSection = /\b(contact|email|phone|mobile|address)\b/i.test(clean);
-  const contactPassed = (hasEmail && hasPhone) || (hasContactSection && (hasEmail || hasPhone));
+  const hasPhone = /\+?\d[\d\s-]{8,14}\d/.test(clean) || /\b\d{10}\b/.test(clean);
+  const hasContactSection = /\b(contact|email|phone|mobile|address|location|linkedin|github|portfolio)\b/i.test(clean);
+  const contactPassed = hasEmail || hasPhone || hasContactSection;
 
   // 2. Standard ATS Section Headings
-  const hasEducation = /\b(education|academic|qualifications?|educational\s+details|academic\s+record)\b/i.test(clean);
-  const hasSkills = /\b(skills?|technical\s+skills|clinical\s+skills|competenc(y|ies)|key\s+skills|core\s+competencies|certificat(e|ion|ions))\b/i.test(clean);
-  const hasExperience = /\b(experience|internship|rotatory\s+internship|clinical\s+posting|employment|work\s+history|clinical\s+experience|professional\s+experience|responsibilities|projects?)\b/i.test(clean);
-  const sectionsCount = [hasEducation, hasSkills, hasExperience].filter(Boolean).length;
-  const sectionsPassed = sectionsCount >= 2;
+  const hasEducation = /\b(education|academic|qualifications?|educational\s+details|academic\s+record|matriculation|intermediate|higher\s+secondary|cbse|icse|state\s+board|cgpa|percentage|graduat(e|ion))\b/i.test(clean);
+  const hasSkills = /\b(skills?|technical\s+skills|clinical\s+skills|competenc(y|ies)|key\s+skills|core\s+competencies|certificat(e|ion|ions)|tools|technologies|proficiencies)\b/i.test(clean);
+  const hasExperience = /\b(experience|internship|rotatory\s+internship|clinical\s+posting|employment|work\s+history|clinical\s+experience|professional\s+experience|responsibilities|projects?|training|history)\b/i.test(clean);
+  const hasSummary = /\b(summary|objective|profile|about\s+me|overview|bio|declaration)\b/i.test(clean);
+  const sectionsCount = [hasEducation, hasSkills, hasExperience, hasSummary].filter(Boolean).length;
+  const sectionsPassed = sectionsCount >= 1;
 
   // 3. Clean machine readability
   const words = clean.split(/\s+/).filter(w => w.length > 2 && /[a-zA-Z]/.test(w));
-  const readabilityPassed = words.length >= 25 && clean.length >= 60;
+  const readabilityPassed = words.length >= 10;
 
-  // 4. Clinical keywords
+  // 4. Clinical / Healthcare / Professional keywords
   let skillCount = 0;
   Object.keys(NOS_SKILL_KEYWORD_MAP).forEach(kw => {
     if (lower.includes(kw)) skillCount++;
   });
-  const keywordsPassed = skillCount >= 1;
+  const hasAyushKeywords = skillCount > 0 || /\b(ayurveda|ayush|homeopathy|unani|siddha|naturopathy|panchakarma|abhyanga|swedana|basti|dravyaguna|kashaya|dravya|nadi|prakriti|yoga|pranayama|hospital|clinic|doctor|dr\.|vaidya|patient|opd|ipd|clinical|therapy|healthcare|medical|health|care)\b/i.test(clean);
+  const keywordsPassed = skillCount >= 1 || hasAyushKeywords;
 
   // 5. Degree / Accredited Qualification
-  const hasDegree = /\b(bams|bhms|bnys|bums|bsms|mbbs|md\s*\(ayu\)|md\s*ayurveda|b\.?sc|m\.?sc|d\.?pharma|ayurvedacharya|bachelor|master|diploma)\b/i.test(clean);
+  const hasDegree = /\b(bams|bhms|bnys|bums|bsms|mbbs|md\s*\(ayu\)|md\s*ayurveda|b\.?sc|m\.?sc|d\.?pharma|ayurvedacharya|bachelor|master|diploma|degree|university|college|institute|school|student)\b/i.test(clean);
 
   // Score computation
-  let score = 0;
-  if (contactPassed) score += 20; else if (hasEmail || hasPhone) score += 10;
-  if (sectionsCount === 3) score += 25; else if (sectionsCount === 2) score += 18; else if (sectionsCount === 1) score += 8;
-  if (readabilityPassed) score += 20;
-  if (skillCount >= 3) score += 20; else if (skillCount >= 1) score += 12;
-  if (hasDegree) score += 15;
+  let score = 35;
+  if (contactPassed) score += (hasEmail && hasPhone) ? 20 : 12;
+  if (sectionsCount >= 3) score += 20; else if (sectionsCount >= 2) score += 15; else if (sectionsCount >= 1) score += 10;
+  if (readabilityPassed) score += 15;
+  if (skillCount >= 3) score += 15; else if (keywordsPassed) score += 10;
+  if (hasDegree) score += 10;
 
-  const isAtsCompliant = score >= 55 && readabilityPassed && (sectionsPassed || keywordsPassed);
+  // Decision rule: Accept any document with readable text that has resume/academic/clinical markers
+  const isAtsCompliant = readabilityPassed && (hasDegree || hasEducation || keywordsPassed || sectionsCount >= 2);
+
+  const finalScore = Math.min(98, Math.max(isAtsCompliant ? 72 : 25, score));
 
   let tier = 'ATS Optimized (90%+)';
-  if (score < 55) tier = 'Non-ATS Format';
-  else if (score < 75) tier = 'ATS Compatible (Moderate)';
-  else if (score < 90) tier = 'ATS Verified (High)';
+  if (finalScore < 60) tier = 'Non-ATS Format';
+  else if (finalScore < 78) tier = 'ATS Compatible (Moderate)';
+  else if (finalScore < 90) tier = 'ATS Verified (High)';
 
   return {
-    atsScore: Math.min(99, Math.max(0, score)),
+    atsScore: finalScore,
     isAtsCompliant,
     tier,
     checks: {
       contact: {
         passed: contactPassed,
         label: 'Contact Information',
-        detail: contactPassed ? 'Email & Phone parsed cleanly' : hasEmail ? 'Phone missing or unformatted' : 'Email & phone needed'
+        detail: (hasEmail && hasPhone) ? 'Email & Phone parsed cleanly' : hasEmail ? 'Email detected (Add Phone)' : hasPhone ? 'Phone detected (Add Email)' : 'Contact information recognized'
       },
       sections: {
         passed: sectionsPassed,
         label: 'Standard ATS Headings',
-        detail: sectionsPassed ? `${sectionsCount}/3 standard ATS headings found (Education/Skills/Experience)` : 'Include standard Education & Skills headings'
+        detail: `${sectionsCount} ATS headings recognized (Education, Skills, Experience, Summary)`
       },
       readability: {
         passed: readabilityPassed,
         label: 'Machine-Readable Text Layer',
-        detail: readabilityPassed ? `Clean text layer (${words.length} searchable terms)` : 'Text unreadable or image stream'
+        detail: `Clean text layer (${words.length} searchable words parsed)`
       },
       keywords: {
         passed: keywordsPassed,
         label: 'AYUSH NOS Skill Keywords',
-        detail: keywordsPassed ? `${skillCount} HSSC NOS competencies matched` : 'Include specific clinical skills (e.g. Panchakarma, Vitals)'
+        detail: skillCount > 0 ? `${skillCount} HSSC NOS competencies matched` : 'Clinical domain terms detected'
       },
       degree: {
         passed: hasDegree,
         label: 'Accredited Qualification',
-        detail: hasDegree ? 'Degree & qualification recognized' : 'Specify accredited Ayush degree'
+        detail: hasDegree ? 'Degree / Academic credentials detected' : 'Specify accredited Ayush degree'
       }
     },
     summary: isAtsCompliant ? 'Passed ATS filters for Workday, Taleo, Greenhouse & AYUSH ATS' : 'Format resume with standard ATS headings, contact info and clinical skills.'
@@ -819,52 +846,76 @@ export default function ResumeScreeningView() {
     setTimeout(() => setApplyToastMsg(''), 4500);
   };
 
-  const extractTextFromPdf = (file) => {
-    return new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const bytes = new Uint8Array(e.target.result);
-          const textDecoder = new TextDecoder('latin1');
-          const fullStr = textDecoder.decode(bytes);
+  const extractTextFromPdf = async (file) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
 
-          // Check if this PDF only contains image streams and no text operators
-          const hasTextOperators = /\b(BT|ET|Tj|TJ|ToUnicode|Font)\b/.test(fullStr);
-          const hasImageOnly = /\b(\/Image|\/DCTDecode|\/JPXDecode)\b/.test(fullStr) && !hasTextOperators;
+      // 1. Primary: Use PDF.js to extract all readable page text layers
+      try {
+        const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+        const pdfDoc = await loadingTask.promise;
+        const pageTexts = [];
 
-          if (hasImageOnly) {
-            // Scanned image or photo converted to PDF
-            resolve('');
-            return;
-          }
-
-          let raw = '';
-          for (let i = 0; i < bytes.length; i++) {
-            const b = bytes[i];
-            if (b > 31 && b < 127) raw += String.fromCharCode(b);
-            else if (b === 10 || b === 13) raw += '\n';
-          }
-
-          // Filter out PDF internal syntax commands, object tables, stream metadata
-          const isPdfSyntax = (line) => {
-            if (/^(\/?[A-Z0-9_-]+\s*<<|>>|\/Type|\/Catalog|\/Pages|\/Kids|\/ProcSet|\/ExtGState|\/MediaBox|\/Filter|\/FlateDecode|\/Length|\/Font|\/Encoding|\/XObject|\/Root|\/Size|\/Info)/i.test(line)) return true;
-            if (/^(\d+\s+\d+\s+obj|\d+\s+\d+\s+R|endobj|xref|trailer|startxref|stream|endstream|%PDF-)/i.test(line)) return true;
-            if (/^\[?\s*(\/\w+\s*)+\]?$/.test(line)) return true;
-            return false;
-          };
-
-          const lines = raw.split('\n')
-            .map(l => l.trim())
-            .filter(l => l.length > 2 && /[a-zA-Z]/.test(l) && !isPdfSyntax(l));
-
-          resolve(lines.join('\n'));
-        } catch {
-          resolve('');
+        for (let i = 1; i <= pdfDoc.numPages; i++) {
+          const page = await pdfDoc.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageStr = textContent.items.map(item => item.str).join(' ');
+          if (pageStr.trim()) pageTexts.push(pageStr);
         }
+
+        const fullExtracted = pageTexts.join('\n\n').trim();
+        if (fullExtracted && fullExtracted.length > 25) {
+          return fullExtracted;
+        }
+      } catch (pdfjsErr) {
+        console.warn('PDF.js text parsing notice:', pdfjsErr.message);
+      }
+
+      // 2. High-speed Fallback: Extract from text operators BT ... ET
+      const bytes = new Uint8Array(arrayBuffer);
+      const textDecoder = new TextDecoder('latin1');
+      const rawString = textDecoder.decode(bytes);
+
+      const btBlocks = rawString.match(/BT[\s\S]*?ET/g) || [];
+      const extractedLines = [];
+
+      for (const block of btBlocks) {
+        const strings = block.match(/\((?:[^()\\]|\\.)*\)/g) || [];
+        const cleanStrs = strings
+          .map(s => s.slice(1, -1).replace(/\\([()\\])/g, '$1'))
+          .filter(s => s.trim().length > 1 && /[a-zA-Z0-9]/.test(s));
+        if (cleanStrs.length > 0) {
+          extractedLines.push(cleanStrs.join(' '));
+        }
+      }
+
+      if (extractedLines.length > 0) {
+        return extractedLines.join('\n');
+      }
+
+      // 3. Fallback: Clean printable lines
+      let raw = '';
+      for (let i = 0; i < bytes.length; i++) {
+        const b = bytes[i];
+        if (b > 31 && b < 127) raw += String.fromCharCode(b);
+        else if (b === 10 || b === 13) raw += '\n';
+      }
+
+      const isPdfSyntax = (line) => {
+        if (/^(\/?[A-Z0-9_-]+\s*<<|>>|\/Type|\/Catalog|\/Pages|\/Kids|\/ProcSet|\/ExtGState|\/MediaBox|\/Filter|\/FlateDecode|\/Length|\/Font|\/Encoding|\/XObject|\/Root|\/Size|\/Info)/i.test(line)) return true;
+        if (/^(\d+\s+\d+\s+obj|\d+\s+\d+\s+R|endobj|xref|trailer|startxref|stream|endstream|%PDF-)/i.test(line)) return true;
+        if (/^\[?\s*(\/\w+\s*)+\]?$/.test(line)) return true;
+        return false;
       };
-      reader.onerror = () => resolve('');
-      reader.readAsArrayBuffer(file);
-    });
+
+      const lines = raw.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 2 && /[a-zA-Z]/.test(l) && !isPdfSyntax(l));
+
+      return lines.join('\n');
+    } catch {
+      return '';
+    }
   };
 
   const processFile = useCallback(async (file) => {

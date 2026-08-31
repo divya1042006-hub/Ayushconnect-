@@ -1281,51 +1281,72 @@ function analyzeAtsComplianceServer(rawText) {
     .replace(/<<.*?>>/g, '')
     .trim();
 
+  if (clean.length < 35) {
+    return {
+      atsScore: 0,
+      isAtsCompliant: false,
+      tier: 'Non-ATS Format',
+      checks: {
+        contact: { passed: false, label: 'Contact Information', detail: 'Document too short or unreadable' },
+        sections: { passed: false, label: 'Standard ATS Headings', detail: 'No section headers detected' },
+        readability: { passed: false, label: 'Machine-Readable Text Layer', detail: 'Insufficient text layer' },
+        keywords: { passed: false, label: 'AYUSH NOS Skill Keywords', detail: '0 keywords matched' },
+        degree: { passed: false, label: 'Accredited Qualification', detail: 'No degree found' }
+      },
+      summary: 'Upload an ATS-compliant resume.'
+    };
+  }
+
   const lower = clean.toLowerCase();
 
   // 1. Contact check (Email, Phone, Name)
   const hasEmail = /[\w.-]+@[\w.-]+\.\w+/.test(clean);
-  const hasPhone = /\+?\d[\d\s-]{8,14}\d/.test(clean);
-  const hasContactSection = /\b(contact|email|phone|mobile|address)\b/i.test(clean);
-  const contactPassed = (hasEmail && hasPhone) || (hasContactSection && (hasEmail || hasPhone));
+  const hasPhone = /\+?\d[\d\s-]{8,14}\d/.test(clean) || /\b\d{10}\b/.test(clean);
+  const hasContactSection = /\b(contact|email|phone|mobile|address|location|linkedin|github|portfolio)\b/i.test(clean);
+  const contactPassed = hasEmail || hasPhone || hasContactSection;
 
   // 2. Standard ATS Section Headings
-  const hasEducation = /\b(education|academic|qualifications?|educational\s+details|academic\s+record)\b/i.test(clean);
-  const hasSkills = /\b(skills?|technical\s+skills|clinical\s+skills|competenc(y|ies)|key\s+skills|core\s+competencies|certificat(e|ion|ions))\b/i.test(clean);
-  const hasExperience = /\b(experience|internship|rotatory\s+internship|clinical\s+posting|employment|work\s+history|clinical\s+experience|professional\s+experience|responsibilities|projects?)\b/i.test(clean);
-  const sectionsCount = [hasEducation, hasSkills, hasExperience].filter(Boolean).length;
-  const sectionsPassed = sectionsCount >= 2;
+  const hasEducation = /\b(education|academic|qualifications?|educational\s+details|academic\s+record|matriculation|intermediate|higher\s+secondary|cbse|icse|state\s+board|cgpa|percentage|graduat(e|ion))\b/i.test(clean);
+  const hasSkills = /\b(skills?|technical\s+skills|clinical\s+skills|competenc(y|ies)|key\s+skills|core\s+competencies|certificat(e|ion|ions)|tools|technologies|proficiencies)\b/i.test(clean);
+  const hasExperience = /\b(experience|internship|rotatory\s+internship|clinical\s+posting|employment|work\s+history|clinical\s+experience|professional\s+experience|responsibilities|projects?|training|history)\b/i.test(clean);
+  const hasSummary = /\b(summary|objective|profile|about\s+me|overview|bio|declaration)\b/i.test(clean);
+  const sectionsCount = [hasEducation, hasSkills, hasExperience, hasSummary].filter(Boolean).length;
+  const sectionsPassed = sectionsCount >= 1;
 
   // 3. Clean machine readability
   const words = clean.split(/\s+/).filter(w => w.length > 2 && /[a-zA-Z]/.test(w));
-  const readabilityPassed = words.length >= 25 && clean.length >= 60;
+  const readabilityPassed = words.length >= 10;
 
-  // 4. Clinical keywords
+  // 4. Clinical / Healthcare keywords
   let skillCount = 0;
   Object.keys(NOS_SKILL_KEYWORD_MAP).forEach(kw => {
     if (lower.includes(kw)) skillCount++;
   });
-  const keywordsPassed = skillCount >= 1;
+  const hasAyushKeywords = skillCount > 0 || /\b(ayurveda|ayush|homeopathy|unani|siddha|naturopathy|panchakarma|abhyanga|swedana|basti|dravyaguna|kashaya|dravya|nadi|prakriti|yoga|pranayama|hospital|clinic|doctor|dr\.|vaidya|patient|opd|ipd|clinical|therapy|healthcare|medical|health|care)\b/i.test(clean);
+  const keywordsPassed = skillCount >= 1 || hasAyushKeywords;
 
   // 5. Degree / Accredited Qualification
-  const hasDegree = /\b(bams|bhms|bnys|bums|bsms|mbbs|md\s*\(ayu\)|md\s*ayurveda|b\.?sc|m\.?sc|d\.?pharma|ayurvedacharya|bachelor|master|diploma)\b/i.test(clean);
+  const hasDegree = /\b(bams|bhms|bnys|bums|bsms|mbbs|md\s*\(ayu\)|md\s*ayurveda|b\.?sc|m\.?sc|d\.?pharma|ayurvedacharya|bachelor|master|diploma|degree|university|college|institute|school|student)\b/i.test(clean);
 
-  let score = 0;
-  if (contactPassed) score += 20; else if (hasEmail || hasPhone) score += 10;
-  if (sectionsCount === 3) score += 25; else if (sectionsCount === 2) score += 18; else if (sectionsCount === 1) score += 8;
-  if (readabilityPassed) score += 20;
-  if (skillCount >= 3) score += 20; else if (skillCount >= 1) score += 12;
-  if (hasDegree) score += 15;
+  // Score computation
+  let score = 35;
+  if (contactPassed) score += (hasEmail && hasPhone) ? 20 : 12;
+  if (sectionsCount >= 3) score += 20; else if (sectionsCount >= 2) score += 15; else if (sectionsCount >= 1) score += 10;
+  if (readabilityPassed) score += 15;
+  if (skillCount >= 3) score += 15; else if (keywordsPassed) score += 10;
+  if (hasDegree) score += 10;
 
-  const isAtsCompliant = score >= 55 && readabilityPassed && (sectionsPassed || keywordsPassed);
+  const isAtsCompliant = readabilityPassed && (hasDegree || hasEducation || keywordsPassed || sectionsCount >= 2);
+
+  const finalScore = Math.min(98, Math.max(isAtsCompliant ? 72 : 25, score));
 
   let tier = 'ATS Optimized (90%+)';
-  if (score < 55) tier = 'Non-ATS Format';
-  else if (score < 75) tier = 'ATS Compatible (Moderate)';
-  else if (score < 90) tier = 'ATS Verified (High)';
+  if (finalScore < 60) tier = 'Non-ATS Format';
+  else if (finalScore < 78) tier = 'ATS Compatible (Moderate)';
+  else if (finalScore < 90) tier = 'ATS Verified (High)';
 
   return {
-    atsScore: Math.min(99, Math.max(0, score)),
+    atsScore: finalScore,
     isAtsCompliant,
     tier,
     checks: {

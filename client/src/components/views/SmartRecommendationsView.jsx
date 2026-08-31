@@ -8,6 +8,11 @@ import {
 } from 'lucide-react';
 import CourseLearningModal from '../common/CourseLearningModal';
 import { isAuthenticResume } from './ResumeScreeningView';
+import * as pdfjsLib from 'pdfjs-dist';
+
+try {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+} catch (_) {}
 
 // ── AI Matching Engine ──────────────────────────────────────────────────────
 // Computes relevance score between student's skill gaps and course/internship
@@ -271,45 +276,70 @@ export default function SmartRecommendationsView({ user }) {
     setIsUploadingResume(true);
 
     try {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        let text = '';
-        if (file.type === 'text/plain') {
-          text = event.target.result || '';
-        } else {
-          try {
-            const bytes = new Uint8Array(event.target.result);
-            const textDecoder = new TextDecoder('latin1');
-            const fullStr = textDecoder.decode(bytes);
+      let text = '';
+      if (file.type === 'text/plain') {
+        text = await file.text();
+      } else {
+        const arrayBuffer = await file.arrayBuffer();
 
-            // If PDF is just an image stream
-            const hasTextOperators = /\b(BT|ET|Tj|TJ|ToUnicode|Font)\b/.test(fullStr);
-            const hasImageOnly = /\b(\/Image|\/DCTDecode|\/JPXDecode)\b/.test(fullStr) && !hasTextOperators;
+        // 1. Try PDF.js
+        try {
+          const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) });
+          const pdfDoc = await loadingTask.promise;
+          const pageTexts = [];
 
-            if (hasImageOnly) {
-              text = '';
-            } else {
-              let raw = '';
-              for (let i = 0; i < bytes.length; i++) {
-                const b = bytes[i];
-                if (b > 31 && b < 127) raw += String.fromCharCode(b);
-                else if (b === 10 || b === 13) raw += '\n';
-              }
-              const isPdfSyntax = (line) => {
-                if (/^(\/?[A-Z0-9_-]+\s*<<|>>|\/Type|\/Catalog|\/Pages|\/Kids|\/ProcSet|\/ExtGState|\/MediaBox|\/Filter|\/FlateDecode|\/Length|\/Font|\/Encoding|\/XObject|\/Root|\/Size|\/Info)/i.test(line)) return true;
-                if (/^(\d+\s+\d+\s+obj|\d+\s+\d+\s+R|endobj|xref|trailer|startxref|stream|endstream|%PDF-)/i.test(line)) return true;
-                if (/^\[?\s*(\/\w+\s*)+\]?$/.test(line)) return true;
-                return false;
-              };
-              const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 2 && /[a-zA-Z]/.test(l) && !isPdfSyntax(l));
-              text = lines.join('\n');
+          for (let i = 1; i <= pdfDoc.numPages; i++) {
+            const page = await pdfDoc.getPage(i);
+            const textContent = await page.getTextContent();
+            const pageStr = textContent.items.map(item => item.str).join(' ');
+            if (pageStr.trim()) pageTexts.push(pageStr);
+          }
+
+          const fullExtracted = pageTexts.join('\n\n').trim();
+          if (fullExtracted && fullExtracted.length > 25) {
+            text = fullExtracted;
+          }
+        } catch (_) {}
+
+        if (!text) {
+          const bytes = new Uint8Array(arrayBuffer);
+          const textDecoder = new TextDecoder('latin1');
+          const rawString = textDecoder.decode(bytes);
+
+          const btBlocks = rawString.match(/BT[\s\S]*?ET/g) || [];
+          const extractedLines = [];
+
+          for (const block of btBlocks) {
+            const strings = block.match(/\((?:[^()\\]|\\.)*\)/g) || [];
+            const cleanStrs = strings
+              .map(s => s.slice(1, -1).replace(/\\([()\\])/g, '$1'))
+              .filter(s => s.trim().length > 1 && /[a-zA-Z0-9]/.test(s));
+            if (cleanStrs.length > 0) {
+              extractedLines.push(cleanStrs.join(' '));
             }
-          } catch {
-            text = '';
+          }
+
+          if (extractedLines.length > 0) {
+            text = extractedLines.join('\n');
+          } else {
+            let raw = '';
+            for (let i = 0; i < bytes.length; i++) {
+              const b = bytes[i];
+              if (b > 31 && b < 127) raw += String.fromCharCode(b);
+              else if (b === 10 || b === 13) raw += '\n';
+            }
+            const isPdfSyntax = (line) => {
+              if (/^(\/?[A-Z0-9_-]+\s*<<|>>|\/Type|\/Catalog|\/Pages|\/Kids|\/ProcSet|\/ExtGState|\/MediaBox|\/Filter|\/FlateDecode|\/Length|\/Font|\/Encoding|\/XObject|\/Root|\/Size|\/Info)/i.test(line)) return true;
+              if (/^(\d+\s+\d+\s+obj|\d+\s+\d+\s+R|endobj|xref|trailer|startxref|stream|endstream|%PDF-)/i.test(line)) return true;
+              if (/^\[?\s*(\/\w+\s*)+\]?$/.test(line)) return true;
+              return false;
+            };
+            text = raw.split('\n').map(l => l.trim()).filter(l => l.length > 2 && /[a-zA-Z]/.test(l) && !isPdfSyntax(l)).join('\n');
           }
         }
+      }
 
-        const cleanText = (text || '').trim();
+      const cleanText = (text || '').trim();
         
         if (!cleanText || !isAuthenticResume(cleanText)) {
           showToast(`❌ Non-ATS Friendly Resume: "${file.name}" does not meet standard ATS parsing criteria. Please upload an ATS-compliant resume with clear Contact details, 'Education', 'Experience', and 'Skills' headings.`);
@@ -391,10 +421,6 @@ export default function SmartRecommendationsView({ user }) {
         setResumeParsedSkills(detected);
         showToast(`📄 Resume personalized! Detected ${detected.length} skills in ${file.name}`);
         setIsUploadingResume(false);
-      };
-
-      if (file.type === 'text/plain') reader.readAsText(file);
-      else reader.readAsArrayBuffer(file);
     } catch (err) {
       console.error(err);
       setIsUploadingResume(false);
