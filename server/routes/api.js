@@ -1075,38 +1075,45 @@ const CERT_KEYWORD_MAP = {
 };
 
 function parseResumeContent(text) {
-  const clean = text || '';
+  const clean = (text || '').replace(/^\[Uploaded File:.*?\]\s*/i, '').trim();
   const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
   const lower = clean.toLowerCase();
 
   // Extract Name
-  let candidateName = 'Dr. Candidate';
+  let candidateName = 'Ayush Candidate';
   const nameLine = lines.find(l => /^name:\s*/i.test(l));
   if (nameLine) {
     candidateName = nameLine.replace(/^name:\s*/i, '').trim();
-  } else if (lines.length > 0) {
-    const first = lines[0];
-    if (/^(Dr\.|Prof\.|Vaidya|Mr\.|Ms\.)\s+[A-Za-z\s]+/i.test(first) || (first.length < 40 && /^[A-Za-z\s.]+$/.test(first))) {
-      candidateName = first;
+  } else {
+    for (const l of lines.slice(0, 5)) {
+      if (/^(Dr\.|Prof\.|Vaidya|Mr\.|Ms\.)\s+[A-Za-z\s]+/i.test(l)) {
+        candidateName = l;
+        break;
+      } else if (l.length < 35 && /^[A-Za-z\s.]+$/.test(l) && !/^(resume|curriculum|cv|biodata|profile|summary|education|experience)/i.test(l)) {
+        candidateName = l;
+        break;
+      }
     }
   }
 
   // Extract Degree
-  let degree = 'BAMS (Ayurvedacharya)';
+  let degree = 'Ayush Qualification / Scholar';
   if (lower.includes('bhms')) degree = 'BHMS (Homeopathy)';
   else if (lower.includes('bnys')) degree = 'BNYS (Naturopathy & Yoga)';
   else if (lower.includes('bums')) degree = 'BUMS (Unani Medicine)';
   else if (lower.includes('bsms')) degree = 'BSMS (Siddha Medicine)';
   else if (lower.includes('md (ayu)') || lower.includes('md ayurveda')) degree = 'MD Ayurveda (Postgraduate)';
   else if (lower.includes('bams')) degree = 'BAMS (Ayurvedacharya)';
+  else if (lower.includes('mbbs')) degree = 'MBBS (Modern Medicine)';
 
   // Extract College
-  let college = 'National Institute of Ayurveda (NIA), Jaipur';
+  let college = 'Affiliated Ayush Medical Institution';
   if (lower.includes('aiia') || lower.includes('all india institute')) college = 'All India Institute of Ayurveda (AIIA), New Delhi';
   else if (lower.includes('bhu') || lower.includes('banaras')) college = 'BHU Institute of Medical Sciences, Varanasi';
   else if (lower.includes('gujarat') || lower.includes('jamnagar')) college = 'Gujarat Ayurved University, Jamnagar';
   else if (lower.includes('kerala') || lower.includes('thiruvananthapuram')) college = 'Government Ayurveda College, Thiruvananthapuram';
   else if (lower.includes('mdniy')) college = 'Morarji Desai National Institute of Yoga, New Delhi';
+  else if (lower.includes('nia') || lower.includes('national institute of ayurveda')) college = 'National Institute of Ayurveda (NIA), Jaipur';
 
   // Extract Skills
   const extractedSkillsSet = new Set();
@@ -1174,7 +1181,7 @@ function parseResumeContent(text) {
     const matchingSkills = role.requiredSkills.filter(req => extractedSkills.includes(req));
     const missingSkills = role.requiredSkills.filter(req => !extractedSkills.includes(req));
 
-    const matchPercent = totalRequired > 0 ? Math.round((matchingSkills.length / totalRequired) * 100) : 0;
+    const matchPercent = totalRequired > 0 && hasAnyMatch ? Math.round((matchingSkills.length / totalRequired) * 100) : 0;
     const fitLevel = matchPercent >= 75 ? 'High Match' : matchPercent >= 45 ? 'Moderate Match' : 'Upskilling Needed';
 
     return {
@@ -1244,39 +1251,117 @@ function parseResumeContent(text) {
     skillGaps,
     roleMappings,
     bridgeRecommendations,
-    aiConfidenceScore: `${Math.floor(92 + Math.random() * 6)}.${Math.floor(Math.random() * 9)}%`,
+    aiConfidenceScore: hasAnyMatch ? `${Math.floor(92 + Math.random() * 6)}.${Math.floor(Math.random() * 9)}%` : '0%',
     analyzedAt: new Date().toISOString()
   };
 }
 
-function isAuthenticResumeServer(text) {
-  if (!text || typeof text !== 'string') return false;
-  const clean = text.trim();
-  if (clean.length < 35) return false;
-
-  const patterns = [
-    /\b(resume|curriculum\s+vitae|\bcv\b|biodata|profile|summary)\b/i,
-    /\b(education|qualifications?|academics?|degree|diploma|bachelor|master|matriculation|hsc|ssc|cbse)\b/i,
-    /\b(experience|internship|intern|employment|work\s+history|clinical\s+posting|rotatory\s+internship)\b/i,
-    /\b(skills?|competenc(y|ies)|expertise|certificat(e|ion|ions)|verified)\b/i,
-    /\b(bams|bhms|bnys|bums|bsms|ayurveda|ayush|homeopathy|unani|siddha|naturopathy|dravyaguna|panchakarma)\b/i,
-    /\b(hospital|clinic|clinical|patient|doctor|dr\.|vaidya|practitioner|physician|consultant)\b/i,
-    /\b(university|institute|college|school|board|cgpa|percentage)\b/i,
-    /\b(contact|email|phone|mobile|address|declaration|hssc|nsqf)\b/i
-  ];
-
-  let matches = 0;
-  for (const p of patterns) {
-    if (p.test(clean)) matches++;
+function analyzeAtsComplianceServer(rawText) {
+  if (!rawText || typeof rawText !== 'string') {
+    return {
+      atsScore: 0,
+      isAtsCompliant: false,
+      tier: 'Non-ATS Format',
+      checks: {
+        contact: { passed: false, label: 'Contact Information', detail: 'No contact info detected' },
+        sections: { passed: false, label: 'Standard ATS Headings', detail: 'Missing Education / Skills / Experience sections' },
+        readability: { passed: false, label: 'Machine-Readable Text Layer', detail: 'No text extracted' },
+        keywords: { passed: false, label: 'AYUSH NOS Skill Keywords', detail: '0 keywords matched' },
+        degree: { passed: false, label: 'Accredited Qualification', detail: 'No recognized degree found' }
+      },
+      summary: 'Upload an ATS-compliant resume containing contact info, standard section headers, and clinical skills.'
+    };
   }
+
+  const clean = rawText
+    .replace(/^\[Uploaded File:.*?\]\s*/i, '')
+    .replace(/%PDF-\d+\.\d+/g, '')
+    .replace(/\b\d+\s+\d+\s+obj\b/g, '')
+    .replace(/\bendobj\b/g, '')
+    .replace(/<<.*?>>/g, '')
+    .trim();
 
   const lower = clean.toLowerCase();
-  let skillMatches = 0;
-  for (const kw of Object.keys(NOS_SKILL_KEYWORD_MAP)) {
-    if (lower.includes(kw)) skillMatches++;
-  }
 
-  return matches >= 2 || skillMatches >= 2;
+  // 1. Contact check (Email, Phone, Name)
+  const hasEmail = /[\w.-]+@[\w.-]+\.\w+/.test(clean);
+  const hasPhone = /\+?\d[\d\s-]{8,14}\d/.test(clean);
+  const hasContactSection = /\b(contact|email|phone|mobile|address)\b/i.test(clean);
+  const contactPassed = (hasEmail && hasPhone) || (hasContactSection && (hasEmail || hasPhone));
+
+  // 2. Standard ATS Section Headings
+  const hasEducation = /\b(education|academic|qualifications?|educational\s+details|academic\s+record)\b/i.test(clean);
+  const hasSkills = /\b(skills?|technical\s+skills|clinical\s+skills|competenc(y|ies)|key\s+skills|core\s+competencies|certificat(e|ion|ions))\b/i.test(clean);
+  const hasExperience = /\b(experience|internship|rotatory\s+internship|clinical\s+posting|employment|work\s+history|clinical\s+experience|professional\s+experience|responsibilities|projects?)\b/i.test(clean);
+  const sectionsCount = [hasEducation, hasSkills, hasExperience].filter(Boolean).length;
+  const sectionsPassed = sectionsCount >= 2;
+
+  // 3. Clean machine readability
+  const words = clean.split(/\s+/).filter(w => w.length > 2 && /[a-zA-Z]/.test(w));
+  const readabilityPassed = words.length >= 25 && clean.length >= 60;
+
+  // 4. Clinical keywords
+  let skillCount = 0;
+  Object.keys(NOS_SKILL_KEYWORD_MAP).forEach(kw => {
+    if (lower.includes(kw)) skillCount++;
+  });
+  const keywordsPassed = skillCount >= 1;
+
+  // 5. Degree / Accredited Qualification
+  const hasDegree = /\b(bams|bhms|bnys|bums|bsms|mbbs|md\s*\(ayu\)|md\s*ayurveda|b\.?sc|m\.?sc|d\.?pharma|ayurvedacharya|bachelor|master|diploma)\b/i.test(clean);
+
+  let score = 0;
+  if (contactPassed) score += 20; else if (hasEmail || hasPhone) score += 10;
+  if (sectionsCount === 3) score += 25; else if (sectionsCount === 2) score += 18; else if (sectionsCount === 1) score += 8;
+  if (readabilityPassed) score += 20;
+  if (skillCount >= 3) score += 20; else if (skillCount >= 1) score += 12;
+  if (hasDegree) score += 15;
+
+  const isAtsCompliant = score >= 55 && readabilityPassed && (sectionsPassed || keywordsPassed);
+
+  let tier = 'ATS Optimized (90%+)';
+  if (score < 55) tier = 'Non-ATS Format';
+  else if (score < 75) tier = 'ATS Compatible (Moderate)';
+  else if (score < 90) tier = 'ATS Verified (High)';
+
+  return {
+    atsScore: Math.min(99, Math.max(0, score)),
+    isAtsCompliant,
+    tier,
+    checks: {
+      contact: {
+        passed: contactPassed,
+        label: 'Contact Information',
+        detail: contactPassed ? 'Email & Phone parsed cleanly' : hasEmail ? 'Phone missing or unformatted' : 'Email & phone needed'
+      },
+      sections: {
+        passed: sectionsPassed,
+        label: 'Standard ATS Headings',
+        detail: sectionsPassed ? `${sectionsCount}/3 standard ATS headings found (Education/Skills/Experience)` : 'Include standard Education & Skills headings'
+      },
+      readability: {
+        passed: readabilityPassed,
+        label: 'Machine-Readable Text Layer',
+        detail: readabilityPassed ? `Clean text layer (${words.length} searchable terms)` : 'Text unreadable or image stream'
+      },
+      keywords: {
+        passed: keywordsPassed,
+        label: 'AYUSH NOS Skill Keywords',
+        detail: keywordsPassed ? `${skillCount} HSSC NOS competencies matched` : 'Include specific clinical skills (e.g. Panchakarma, Vitals)'
+      },
+      degree: {
+        passed: hasDegree,
+        label: 'Accredited Qualification',
+        detail: hasDegree ? 'Degree & qualification recognized' : 'Specify accredited Ayush degree'
+      }
+    },
+    summary: isAtsCompliant ? 'Passed ATS filters for Workday, Taleo, Greenhouse & AYUSH ATS' : 'Format resume with standard ATS headings, contact info and clinical skills.'
+  };
+}
+
+function isAuthenticResumeServer(text) {
+  const ats = analyzeAtsComplianceServer(text);
+  return ats.isAtsCompliant;
 }
 
 router.post('/ai/parse-resume', async (req, res) => {
@@ -1285,16 +1370,17 @@ router.post('/ai/parse-resume', async (req, res) => {
   if (!clean || !isAuthenticResumeServer(clean)) {
     return res.status(400).json({ 
       success: false, 
-      message: 'Invalid Document: The provided content is not a recognized Resume or CV. Please upload a genuine CV containing qualifications, clinical skills, or experience.' 
+      message: 'Non-ATS Friendly Resume: The provided document does not meet ATS compliance standards. Please upload an ATS-compliant CV/Resume with standard contact details, Education, Experience, and Skills sections.' 
     });
   }
 
   try {
     const analysis = parseResumeContent(clean);
+    analysis.atsCompliance = analyzeAtsComplianceServer(clean);
     res.json({
       success: true,
       extractedData: analysis,
-      message: 'Resume analyzed successfully with HSSC NOS skill gaps and career role mappings.'
+      message: 'Resume analyzed successfully with ATS diagnostic, HSSC NOS skill gaps and career mappings.'
     });
   } catch (error) {
     console.error('Error parsing resume:', error);

@@ -7,6 +7,7 @@ import {
   QrCode, Share2, Bookmark, Copy, ExternalLink, X, Filter, Upload, FileText, Compass, Check
 } from 'lucide-react';
 import CourseLearningModal from '../common/CourseLearningModal';
+import { isAuthenticResume } from './ResumeScreeningView';
 
 // ── AI Matching Engine ──────────────────────────────────────────────────────
 // Computes relevance score between student's skill gaps and course/internship
@@ -288,12 +289,19 @@ export default function SmartRecommendationsView({ user }) {
             if (hasImageOnly) {
               text = '';
             } else {
+              let raw = '';
               for (let i = 0; i < bytes.length; i++) {
                 const b = bytes[i];
-                if (b > 31 && b < 127) text += String.fromCharCode(b);
-                else if (b === 10 || b === 13) text += '\n';
+                if (b > 31 && b < 127) raw += String.fromCharCode(b);
+                else if (b === 10 || b === 13) raw += '\n';
               }
-              const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3 && /[a-zA-Z]/.test(l));
+              const isPdfSyntax = (line) => {
+                if (/^(\/?[A-Z0-9_-]+\s*<<|>>|\/Type|\/Catalog|\/Pages|\/Kids|\/ProcSet|\/ExtGState|\/MediaBox|\/Filter|\/FlateDecode|\/Length|\/Font|\/Encoding|\/XObject|\/Root|\/Size|\/Info)/i.test(line)) return true;
+                if (/^(\d+\s+\d+\s+obj|\d+\s+\d+\s+R|endobj|xref|trailer|startxref|stream|endstream|%PDF-)/i.test(line)) return true;
+                if (/^\[?\s*(\/\w+\s*)+\]?$/.test(line)) return true;
+                return false;
+              };
+              const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 2 && /[a-zA-Z]/.test(l) && !isPdfSyntax(l));
               text = lines.join('\n');
             }
           } catch {
@@ -302,10 +310,11 @@ export default function SmartRecommendationsView({ user }) {
         }
 
         const cleanText = (text || '').trim();
-        const resumeKeywordCheck = /\b(resume|cv|curriculum\s+vitae|education|qualification|experience|internship|skills|bams|bhms|bnys|bums|bsms|ayurveda|doctor|clinical|hospital|university)\b/i;
         
-        if (!cleanText || cleanText.length < 35 || !resumeKeywordCheck.test(cleanText)) {
-          showToast(`❌ Invalid Document: "${file.name}" is not a recognized CV/Resume. Image PDFs and non-resume files are not supported.`);
+        if (!cleanText || !isAuthenticResume(cleanText)) {
+          showToast(`❌ Non-ATS Friendly Resume: "${file.name}" does not meet standard ATS parsing criteria. Please upload an ATS-compliant resume with clear Contact details, 'Education', 'Experience', and 'Skills' headings.`);
+          setResumeParsedSkills(null);
+          setResumeFileName('');
           setIsUploadingResume(false);
           e.target.value = '';
           return;
@@ -331,7 +340,7 @@ export default function SmartRecommendationsView({ user }) {
                   formatted.push({ name: g.skill, score: g.proficiencyScore, target: 90, status: 'gap' });
                 });
                 setResumeParsedSkills(formatted);
-                showToast(`📄 Parsed "${file.name}"! Recommendations re-ranked to your exact skill gaps.`);
+                showToast(`📄 Parsed "${file.name}"! Recommendations re-ranked to your verified resume skills.`);
                 setIsUploadingResume(false);
                 return;
               }
@@ -371,9 +380,11 @@ export default function SmartRecommendationsView({ user }) {
         });
 
         if (detected.length === 0) {
-          showToast(`⚠️ No recognized Ayush clinical skills found in "${file.name}". Showing default recommendations.`);
-          setResumeParsedSkills([]);
+          showToast(`⚠️ No recognized Ayush clinical skills found in "${file.name}". Progress remains unassessed.`);
+          setResumeParsedSkills(null);
+          setResumeFileName('');
           setIsUploadingResume(false);
+          e.target.value = '';
           return;
         }
 
