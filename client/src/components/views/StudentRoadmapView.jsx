@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Compass, CheckCircle2, AlertCircle, Award, Sparkles, ChevronRight, BookOpen, Layers, RefreshCw } from 'lucide-react';
 import { API_BASE } from '../../api';
+import { supabase } from '../../supabaseClient';
 
 // ── Embedded Qualification Packs (works offline — no API needed) ────────────
 const QUAL_PACKS = [
@@ -107,6 +108,16 @@ export default function StudentRoadmapView({ user, setUser }) {
             xp: (base.xp || 1420) + (data.xpGained || 150)
           };
           try { localStorage.setItem('ayush_user', JSON.stringify(updated)); } catch(e) {}
+          
+          // Sync with Supabase users table
+          if (base.email) {
+            supabase.from('users').update({
+              readiness_score: data.readinessScore,
+              skills: JSON.stringify(data.skills || []),
+              xp: updated.xp
+            }).ilike('email', base.email.trim()).catch(() => {});
+          }
+
           return updated;
         });
       }

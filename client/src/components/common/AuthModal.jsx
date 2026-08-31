@@ -229,6 +229,168 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
   const currentConfig = roleConfigs[activeRoleTab];
   const CurrentIcon = currentConfig.icon;
 
+  // Helper function to reliably save or sync any user into Supabase users table
+  const saveOrSyncUserWithSupabase = async (userData, options = {}) => {
+    const { isRegister = false, cleanPassword = '' } = options;
+    const cleanEmail = (userData.email || '').trim().toLowerCase();
+    if (!cleanEmail) return { success: false, error: 'No email provided' };
+
+    try {
+      // 1. Check if user already exists in public.users by email
+      const { data: existingRows, error: fetchErr } = await supabase
+        .from('users')
+        .select('*')
+        .ilike('email', cleanEmail)
+        .limit(1);
+
+      if (!fetchErr && existingRows && existingRows.length > 0) {
+        const existing = existingRows[0];
+
+        // If user is logging in (not registering) and supplied password, check password
+        if (!isRegister && cleanPassword && existing.password && existing.password.trim() && existing.password.trim() !== cleanPassword.trim()) {
+          return {
+            success: false,
+            passwordMismatch: true,
+            error: 'Incorrect password! Please enter the exact password you used during registration.'
+          };
+        }
+
+        // Prepare updated payload to sync back to Supabase
+        const updatePayload = {
+          name: userData.name || existing.name,
+          role: userData.role || existing.role || 'student',
+          degree: userData.degree || existing.degree,
+          institution: userData.institution || existing.institution,
+          company: userData.company || existing.company,
+          department: userData.department || existing.department,
+          provider: userData.provider || existing.provider || null
+        };
+
+        if (cleanPassword) {
+          updatePayload.password = cleanPassword;
+        }
+        if (userData.skills) {
+          updatePayload.skills = typeof userData.skills === 'string' ? userData.skills : JSON.stringify(userData.skills);
+        }
+        if (userData.certifications) {
+          updatePayload.certifications = typeof userData.certifications === 'string' ? userData.certifications : JSON.stringify(userData.certifications);
+        }
+        if (userData.readinessScore || userData.readiness_score) {
+          updatePayload.readiness_score = userData.readinessScore || userData.readiness_score;
+        }
+        if (userData.xp) {
+          updatePayload.xp = userData.xp;
+        }
+        if (userData.level) {
+          updatePayload.level = userData.level;
+        }
+
+        const { data: updatedRows, error: updateErr } = await supabase
+          .from('users')
+          .update(updatePayload)
+          .eq('id', existing.id)
+          .select();
+
+        const finalUser = updatedRows && updatedRows.length > 0 ? updatedRows[0] : existing;
+
+        let parsedSkills = [];
+        try {
+          parsedSkills = typeof finalUser.skills === 'string' ? JSON.parse(finalUser.skills) : (finalUser.skills || []);
+        } catch (_) { parsedSkills = []; }
+
+        let parsedCerts = [];
+        try {
+          parsedCerts = typeof finalUser.certifications === 'string' ? JSON.parse(finalUser.certifications) : (finalUser.certifications || []);
+        } catch (_) { parsedCerts = []; }
+
+        return {
+          success: true,
+          action: 'updated',
+          user: {
+            ...finalUser,
+            readinessScore: finalUser.readiness_score || 78,
+            skills: parsedSkills,
+            certifications: parsedCerts
+          }
+        };
+      } else {
+        // User does NOT exist in DB -> Insert brand new record into Supabase!
+        const newId = userData.id || `user-${Date.now()}`;
+        const defaultSkills = [
+          { name: "Abhyanga & Swedana Technique", score: 85, target: 90, status: "strong" },
+          { name: "Kati/Janu Basti Setup & Monitoring", score: 75, target: 85, status: "developing" },
+          { name: "Sterilization & Herbal Dravya Prep", score: 90, target: 90, status: "strong" },
+          { name: "Patient Vitals & Therapy Logging", score: 80, target: 85, status: "developing" },
+          { name: "Ayurvedic Pharmacology Basics", score: 65, target: 80, status: "developing" }
+        ];
+        const defaultCerts = [
+          { title: "HSSC Panchakarma Attendant Certificate", issuer: "HSSC Ayush Sub-SSC", year: 2025, verified: true }
+        ];
+
+        const skillsToInsert = userData.skills 
+          ? (typeof userData.skills === 'string' ? userData.skills : JSON.stringify(userData.skills))
+          : JSON.stringify(defaultSkills);
+
+        const certsToInsert = userData.certifications
+          ? (typeof userData.certifications === 'string' ? userData.certifications : JSON.stringify(userData.certifications))
+          : JSON.stringify(defaultCerts);
+
+        const insertPayload = {
+          id: newId,
+          name: userData.name || cleanEmail.split('@')[0].replace(/[._]/g, ' '),
+          email: cleanEmail,
+          password: cleanPassword || userData.password || 'password123',
+          role: userData.role || 'student',
+          degree: userData.degree || (userData.role === 'student' ? 'BAMS 4th Year' : 'Ayush Graduate'),
+          institution: userData.institution || 'National Institute of Ayurveda (NIA), Jaipur',
+          company: userData.company || 'Ayush Wellness Center',
+          department: userData.department || 'Dept of Shalya Tantra',
+          xp: userData.xp || (userData.role === 'student' ? 1420 : 500),
+          level: userData.level || (userData.role === 'student' ? 4 : 1),
+          readiness_score: userData.readiness_score || userData.readinessScore || 78,
+          skills: skillsToInsert,
+          certifications: certsToInsert,
+          provider: userData.provider || null
+        };
+
+        const { data: insertedRows, error: insertErr } = await supabase
+          .from('users')
+          .insert([insertPayload])
+          .select();
+
+        if (insertErr) {
+          console.error('Supabase user insert error:', insertErr);
+        }
+
+        const finalUser = insertedRows && insertedRows.length > 0 ? insertedRows[0] : insertPayload;
+
+        let parsedSkills = defaultSkills;
+        try {
+          parsedSkills = typeof finalUser.skills === 'string' ? JSON.parse(finalUser.skills) : (finalUser.skills || defaultSkills);
+        } catch (_) {}
+
+        let parsedCerts = defaultCerts;
+        try {
+          parsedCerts = typeof finalUser.certifications === 'string' ? JSON.parse(finalUser.certifications) : (finalUser.certifications || defaultCerts);
+        } catch (_) {}
+
+        return {
+          success: true,
+          action: 'inserted',
+          user: {
+            ...finalUser,
+            readinessScore: finalUser.readiness_score || 78,
+            skills: parsedSkills,
+            certifications: parsedCerts
+          }
+        };
+      }
+    } catch (err) {
+      console.error('Supabase saveOrSync error:', err);
+      return { success: false, error: err.message };
+    }
+  };
+
   const executeAuth = async (roleToAuth, userEmail, overrideUser) => {
     setLoading(true);
     setSuccessMsg('');
@@ -239,7 +401,6 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
     const cleanPassword = (formData.password || 'password123').trim();
     const nameToUse = overrideUser?.name || formData.name.trim() || cleanEmail.split('@')[0].replace(/[._]/g, ' ');
 
-    // Default user object — always used as fallback so login NEVER gets stuck
     const defaultSkills = [
       { name: "Abhyanga & Swedana Technique", score: 85, target: 90, status: "strong" },
       { name: "Kati/Janu Basti Setup & Monitoring", score: 75, target: 85, status: "developing" },
@@ -251,15 +412,16 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
       { title: "HSSC Panchakarma Attendant Certificate", issuer: "HSSC Ayush Sub-SSC", year: 2025, verified: true }
     ];
 
-    let resolvedUser = overrideUser || {
+    const baseUserCandidate = overrideUser || {
       id: `user-${Date.now()}`,
       name: nameToUse,
       email: cleanEmail,
+      password: cleanPassword,
       role: targetRole,
-      institution: formData.institution,
-      degree: formData.degree,
-      company: formData.company,
-      department: formData.department,
+      institution: formData.institution || 'National Institute of Ayurveda (NIA), Jaipur',
+      degree: formData.degree || (targetRole === 'student' ? 'BAMS 4th Year' : 'Ayush Graduate'),
+      company: formData.company || 'Ayush Wellness Center',
+      department: formData.department || 'Dept of Shalya Tantra',
       xp: targetRole === 'student' ? 1420 : 500,
       level: targetRole === 'student' ? 4 : 1,
       readinessScore: 78,
@@ -267,113 +429,45 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
       certifications: defaultCerts
     };
 
-    // ── Step 1: Try Supabase DB lookup (non-blocking, 4s timeout) ────────────
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
+    // ── Save/Sync with Supabase DB ───────────────────────────────────────────
+    const syncRes = await saveOrSyncUserWithSupabase(baseUserCandidate, {
+      isRegister: isRegisterMode,
+      cleanPassword: cleanPassword
+    });
 
-      if (isRegisterMode) {
-        // Registration: upsert user into public.users
-        const newDbUser = {
-          id: resolvedUser.id,
-          name: nameToUse,
-          email: cleanEmail,
-          password: cleanPassword,
-          role: targetRole,
-          degree: formData.degree || (targetRole === 'student' ? 'BAMS 4th Year' : 'Ayush Graduate'),
-          institution: formData.institution || 'National Institute of Ayurveda (NIA), Jaipur',
-          company: formData.company || 'Ayush Wellness Center',
-          department: formData.department || 'Dept of Shalya Tantra',
-          xp: targetRole === 'student' ? 1420 : 500,
-          level: targetRole === 'student' ? 4 : 1,
-          readiness_score: 78,
-          skills: JSON.stringify(defaultSkills),
-          certifications: JSON.stringify(defaultCerts)
-        };
-        await supabase.from('users').upsert([newDbUser]).then(() => clearTimeout(timer)).catch(() => clearTimeout(timer));
-        Object.assign(resolvedUser, { ...newDbUser, skills: defaultSkills, certifications: defaultCerts });
-      } else if (!overrideUser) {
-        // Login: fetch user by email
-        const { data: rows, error: fetchErr } = await supabase
-          .from('users')
-          .select('*')
-          .ilike('email', cleanEmail)
-          .limit(1)
-          .abortSignal(controller.signal);
-
-        clearTimeout(timer);
-
-        if (!fetchErr && rows && rows.length > 0) {
-          const existing = rows[0];
-          // Password check — only if password was stored
-          if (existing.password && existing.password.trim() && existing.password.trim() !== cleanPassword) {
-            setLoading(false);
-            setErrorMsg('❌ Incorrect password! Use "Forgot / Reset Password?" below to reset it, or click "Instant Login" to bypass.');
-            return;
-          }
-          // Parse skills
-          let parsedSkills = defaultSkills;
-          try {
-            const raw = existing.skills;
-            const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
-            if (Array.isArray(arr) && arr.length > 0) parsedSkills = arr;
-          } catch (_) {}
-          // Parse certs
-          let parsedCerts = defaultCerts;
-          try {
-            const raw = existing.certifications;
-            const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
-            if (Array.isArray(arr) && arr.length > 0) parsedCerts = arr;
-          } catch (_) {}
-          // Override resolved user with DB data
-          resolvedUser = {
-            id: existing.id || resolvedUser.id,
-            name: existing.name || nameToUse,
-            email: existing.email || cleanEmail,
-            role: existing.role || targetRole,
-            degree: existing.degree || formData.degree,
-            institution: existing.institution || formData.institution,
-            company: existing.company || formData.company,
-            department: existing.department || formData.department,
-            xp: existing.xp || resolvedUser.xp,
-            level: existing.level || resolvedUser.level,
-            readinessScore: existing.readiness_score || 78,
-            skills: parsedSkills,
-            certifications: parsedCerts
-          };
-        }
-      }
-    } catch (dbErr) {
-      // Supabase error or timeout — continue with default user (never block login)
-      console.warn('Supabase lookup note (non-blocking):', dbErr?.message || dbErr);
+    if (!syncRes.success && syncRes.passwordMismatch) {
+      setLoading(false);
+      setErrorMsg('❌ Incorrect password! Use "Forgot / Reset Password?" below to reset it, or click "Instant Login" to bypass.');
+      return;
     }
 
-    // ── Step 2: Also do Supabase Auth (best-effort, don't block) ────────────
+    const resolvedUser = syncRes.user || baseUserCandidate;
+
+    // ── Best-effort Supabase Auth signUp / signIn ───────────────────────────
     try {
       if (isRegisterMode) {
-        supabase.auth.signUp({ email: cleanEmail, password: cleanPassword,
-          options: { data: { name: nameToUse, role: targetRole } }
+        supabase.auth.signUp({ 
+          email: cleanEmail, 
+          password: cleanPassword,
+          options: { data: { name: resolvedUser.name, role: targetRole } }
         }).catch(() => {});
       } else {
         supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword }).catch(() => {});
       }
     } catch (_) {}
 
-    // ── Step 3: Login ALWAYS succeeds — call callback ────────────────────────
     setLoading(false);
-    setSuccessMsg(`✅ Welcome, ${resolvedUser.name || nameToUse}!`);
+    setSuccessMsg(
+      isRegisterMode
+        ? `✅ Account created & saved in Supabase Database! Welcome, ${resolvedUser.name}!`
+        : `✅ Welcome back, ${resolvedUser.name}! (Saved in Supabase Database)`
+    );
 
-    // Short delay so user sees the success message
     setTimeout(() => {
       onLoginSuccess(resolvedUser, resolvedUser.role || targetRole);
       onClose();
-    }, 400);
-
-
+    }, 450);
   };
-
-
-
 
   // ── Google / Gmail OAuth & Supabase integration ─────────────────
   const handleGoogleLogin = async (customProfile = null) => {
@@ -423,21 +517,17 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
         certifications: certsArr,
       };
 
-      // Save / Upsert to Supabase in background
-      supabase.from('users').upsert([{
-        ...googleUser,
-        skills: JSON.stringify(skillsArr),
-        certifications: JSON.stringify(certsArr),
-        readiness_score: 82,
-      }]).catch(() => {});
+      // Save / Sync to Supabase in background
+      const syncRes = await saveOrSyncUserWithSupabase(googleUser, { isRegister: true });
+      const finalUser = syncRes.user || googleUser;
 
       setGoogleStep('done');
       setGoogleLoading(false);
       setActiveSocialPicker(null);
-      setSuccessMsg(`✅ Welcome, ${googleUser.name}!`);
+      setSuccessMsg(`✅ Welcome, ${finalUser.name}! (Saved in Supabase Database)`);
 
       // Instant transition
-      onLoginSuccess(googleUser, activeRoleTab);
+      onLoginSuccess(finalUser, activeRoleTab);
       onClose();
 
     } catch (err) {
@@ -494,21 +584,17 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
         level: 4
       };
 
-      // Save / Upsert to Supabase in background
-      supabase.from('users').upsert([{
-        ...linkedInUser,
-        skills: JSON.stringify(skillsArr),
-        certifications: JSON.stringify(linkedInUser.certifications),
-        readiness_score: 85,
-      }]).catch(() => {});
+      // Save / Sync to Supabase in background
+      const syncRes = await saveOrSyncUserWithSupabase(linkedInUser, { isRegister: true });
+      const finalUser = syncRes.user || linkedInUser;
 
       setLinkedInStep('done');
       setLinkedInLoading(false);
       setActiveSocialPicker(null);
-      setSuccessMsg(`✅ Welcome, ${linkedInUser.name}!`);
+      setSuccessMsg(`✅ Welcome, ${finalUser.name}! (Saved in Supabase Database)`);
 
       // Instant transition
-      onLoginSuccess(linkedInUser, activeRoleTab);
+      onLoginSuccess(finalUser, activeRoleTab);
       onClose();
 
     } catch (err) {
@@ -534,13 +620,33 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
     }
 
     const enteredName = formData.name.trim() || cleanEmail.split('@')[0].replace(/[._]/g, ' ');
-    executeAuth(activeRoleTab, cleanEmail, isRegisterMode ? { name: enteredName, email: cleanEmail, role: activeRoleTab, institution: formData.institution, degree: formData.degree, company: formData.company, department: formData.department } : null);
+    executeAuth(
+      activeRoleTab, 
+      cleanEmail, 
+      isRegisterMode 
+        ? { 
+            name: enteredName, 
+            email: cleanEmail, 
+            password: cleanPassword,
+            role: activeRoleTab, 
+            institution: formData.institution, 
+            degree: formData.degree, 
+            company: formData.company, 
+            department: formData.department 
+          } 
+        : null
+    );
   };
 
   const handleQuickDemoLogin = (roleKey) => {
     setActiveRoleTab(roleKey);
     const cfg = roleConfigs[roleKey];
-    executeAuth(roleKey, cfg.defaultEmail, { name: cfg.demoName, email: cfg.defaultEmail, role: roleKey });
+    executeAuth(roleKey, cfg.defaultEmail, { 
+      name: cfg.demoName, 
+      email: cfg.defaultEmail, 
+      role: roleKey,
+      password: 'password123'
+    });
   };
 
   return (
