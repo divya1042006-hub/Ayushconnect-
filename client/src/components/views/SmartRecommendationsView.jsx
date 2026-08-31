@@ -250,7 +250,23 @@ export default function SmartRecommendationsView({ user }) {
   const handleQuickResumeUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    setResumeFileName(file.name);
+
+    // Reject image files explicitly
+    const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|heic|ico)$/i.test(file.name) || (file.type && file.type.startsWith('image/'));
+    if (isImage) {
+      showToast('⚠️ Image files cannot be parsed as resumes. Please upload a PDF, DOCX, DOC, or TXT CV.');
+      e.target.value = '';
+      return;
+    }
+
+    // Strict document check
+    const allowed = /\.(pdf|txt|doc|docx)$/i;
+    if (!allowed.test(file.name)) {
+      showToast('⚠️ Unsupported file format. Please upload a valid Resume/CV (.PDF, .DOCX, .DOC, .TXT).');
+      e.target.value = '';
+      return;
+    }
+
     setIsUploadingResume(true);
 
     try {
@@ -267,44 +283,89 @@ export default function SmartRecommendationsView({ user }) {
               if (b > 31 && b < 127) text += String.fromCharCode(b);
               else if (b === 10 || b === 13) text += '\n';
             }
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3 && /[a-zA-Z]/.test(l));
+            text = lines.join('\n');
           } catch {
-            text = file.name;
+            text = '';
           }
         }
+
+        const cleanText = (text || '').trim();
+        if (!cleanText || cleanText.length < 20) {
+          showToast(`⚠️ Could not extract readable text from "${file.name}". Please upload a valid text-based CV.`);
+          setIsUploadingResume(false);
+          e.target.value = '';
+          return;
+        }
+
+        setResumeFileName(file.name);
 
         try {
           const res = await fetch(`${API_BASE}/api/ai/parse-resume`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ resumeText: text || file.name })
+            body: JSON.stringify({ resumeText: cleanText })
           });
           if (res.ok) {
             const data = await res.json();
             if (data?.success && data.extractedData) {
-              const formatted = (data.extractedData.extractedSkills || []).map(s => ({
-                name: s, score: 85, target: 90, status: 'strong'
-              }));
-              (data.extractedData.skillGaps || []).filter(g => g.isGap).forEach(g => {
-                formatted.push({ name: g.skill, score: g.proficiencyScore, target: 90, status: 'gap' });
-              });
-              setResumeParsedSkills(formatted);
-              showToast(`📄 Parsed "${file.name}"! Recommendations re-ranked to your exact skill gaps.`);
-              setIsUploadingResume(false);
-              return;
+              const extracted = data.extractedData.extractedSkills || [];
+              if (extracted.length > 0) {
+                const formatted = extracted.map(s => ({
+                  name: s, score: 85, target: 90, status: 'strong'
+                }));
+                (data.extractedData.skillGaps || []).filter(g => g.isGap).forEach(g => {
+                  formatted.push({ name: g.skill, score: g.proficiencyScore, target: 90, status: 'gap' });
+                });
+                setResumeParsedSkills(formatted);
+                showToast(`📄 Parsed "${file.name}"! Recommendations re-ranked to your exact skill gaps.`);
+                setIsUploadingResume(false);
+                return;
+              }
             }
           }
         } catch (_) {}
 
-        // Local fallback
-        const mockSkills = [
-          { name: 'Panchakarma Procedure Execution', score: 85, target: 90, status: 'strong' },
-          { name: 'Abhyanga & Swedana', score: 90, target: 90, status: 'strong' },
-          { name: 'Patient Vital Signs Monitoring', score: 80, target: 90, status: 'developing' },
-          { name: 'Ayurvedic Herbal Kashaya Preparation', score: 50, target: 90, status: 'gap' },
-          { name: 'Tele-Ayurveda Protocols', score: 40, target: 90, status: 'gap' }
-        ];
-        setResumeParsedSkills(mockSkills);
-        showToast(`📄 Resume personalized! Skill gaps updated for ${file.name}`);
+        // Local keyword-based skill extraction fallback
+        const lower = cleanText.toLowerCase();
+        const detected = [];
+        const AYUSH_SKILL_KEYWORDS = {
+          'panchakarma': 'Panchakarma Procedure Execution',
+          'abhyanga': 'Abhyanga & Swedana',
+          'swedana': 'Abhyanga & Swedana',
+          'vital signs': 'Patient Vital Signs Monitoring',
+          'pulse diagnosis': 'Nadi Pariksha (Pulse Diagnostics)',
+          'nadi': 'Nadi Pariksha (Pulse Diagnostics)',
+          'kashaya': 'Ayurvedic Herbal Kashaya Preparation',
+          'dravya': 'Ayurvedic Herbal Kashaya Preparation',
+          'tele-ayurveda': 'Tele-Ayurveda Protocols',
+          'telemedicine': 'Tele-Ayurveda Protocols',
+          'yoga': 'Therapeutic Yoga & Pranayama',
+          'pranayama': 'Therapeutic Yoga & Pranayama',
+          'basti': 'Kati/Janu Basti Setup',
+          'documentation': 'Clinical Documentation & Logging',
+          'shilajit': 'Rasa Shastra & Bhasma Standardization',
+          'bhasma': 'Rasa Shastra & Bhasma Standardization',
+          'prakriti': 'Prakriti-Based Diet Planning',
+          'marma': 'Marma Therapy Execution',
+          'leech': 'Jalaukavacharana (Leech Therapy)'
+        };
+
+        Object.entries(AYUSH_SKILL_KEYWORDS).forEach(([kw, skill]) => {
+          if (lower.includes(kw) && !detected.some(d => d.name === skill)) {
+            detected.push({ name: skill, score: 85, target: 90, status: 'strong' });
+          }
+        });
+
+        if (detected.length === 0) {
+          showToast(`⚠️ No recognized Ayush clinical skills found in "${file.name}". Showing default recommendations.`);
+          setResumeParsedSkills([]);
+          setIsUploadingResume(false);
+          return;
+        }
+
+        setResumeParsedSkills(detected);
+        showToast(`📄 Resume personalized! Detected ${detected.length} skills in ${file.name}`);
         setIsUploadingResume(false);
       };
 
@@ -313,6 +374,7 @@ export default function SmartRecommendationsView({ user }) {
     } catch (err) {
       console.error(err);
       setIsUploadingResume(false);
+      showToast('⚠️ Error processing resume file.');
     }
   };
 

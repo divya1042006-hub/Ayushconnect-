@@ -491,23 +491,24 @@ function parseResumeLocally(text) {
   Object.entries(NOS_SKILL_KEYWORD_MAP).forEach(([kw, skill]) => {
     if (lower.includes(kw)) extractedSkillsSet.add(skill);
   });
-  if (extractedSkillsSet.size === 0) {
-    extractedSkillsSet.add('Panchakarma Procedure Execution');
-    extractedSkillsSet.add('Patient Vital Signs Monitoring');
-  }
   const extractedSkills = Array.from(extractedSkillsSet);
 
   const certsSet = new Set();
   Object.entries(CERT_KEYWORD_MAP).forEach(([kw, cert]) => {
     if (lower.includes(kw)) certsSet.add(cert);
   });
-  if (certsSet.size === 0) certsSet.add('HSSC Panchakarma Attendant (Verified)');
   const detectedCertificates = Array.from(certsSet);
+
+  const hasAnyMatch = extractedSkills.length > 0;
 
   const skillGaps = ALL_NOS_BENCHMARKS.map(bench => {
     const isMastered = extractedSkills.includes(bench.name);
     let status = isMastered ? 'Mastered' : 'Gap';
-    let proficiencyScore = isMastered ? Math.floor(84 + Math.random() * 12) : Math.floor(35 + Math.random() * 25);
+    let proficiencyScore = isMastered 
+      ? Math.floor(82 + Math.random() * 14) 
+      : hasAnyMatch 
+        ? Math.floor(30 + Math.random() * 30) 
+        : 0;
     let urgency = !isMastered ? (bench.weight >= 15 ? 'Critical' : 'Moderate') : 'None';
 
     return {
@@ -523,15 +524,19 @@ function parseResumeLocally(text) {
 
   const masteredCount = skillGaps.filter(g => g.status === 'Mastered').length;
   const gapCount = skillGaps.filter(g => g.isGap).length;
-  const overallReadinessScore = Math.min(96, Math.max(58, Math.round(55 + (masteredCount / ALL_NOS_BENCHMARKS.length) * 40 + detectedCertificates.length * 3)));
+  
+  // Real score calculation: 0 if no skills matched from resume
+  const overallReadinessScore = !hasAnyMatch 
+    ? 0 
+    : Math.min(98, Math.max(25, Math.round((masteredCount / ALL_NOS_BENCHMARKS.length) * 80 + Math.min(18, detectedCertificates.length * 6))));
 
   const roleMappings = AYUSH_CAREER_ROLES_LOCAL.map(role => {
     const totalRequired = role.requiredSkills.length;
     const matchingSkills = role.requiredSkills.filter(req => extractedSkills.includes(req));
     const missingSkills = role.requiredSkills.filter(req => !extractedSkills.includes(req));
 
-    const matchPercent = Math.min(98, Math.max(42, Math.round((matchingSkills.length / totalRequired) * 100)));
-    const fitLevel = matchPercent >= 80 ? 'High Match' : matchPercent >= 60 ? 'Moderate Match' : 'Upskilling Needed';
+    const matchPercent = totalRequired > 0 ? Math.round((matchingSkills.length / totalRequired) * 100) : 0;
+    const fitLevel = matchPercent >= 75 ? 'High Match' : matchPercent >= 45 ? 'Moderate Match' : 'Upskilling Needed';
 
     return {
       ...role,
@@ -668,22 +673,37 @@ export default function ResumeScreeningView() {
             else if (b === 10 || b === 13) text += '\n';
           }
           const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3 && /[a-zA-Z]/.test(l) && !/^[\d\s\W]+$/.test(l));
-          resolve(lines.join('\n') || `PDF Resume: ${file.name}`);
+          resolve(lines.join('\n'));
         } catch {
-          resolve(`PDF Resume: ${file.name}`);
+          resolve('');
         }
       };
-      reader.onerror = () => resolve(`PDF Resume: ${file.name}`);
+      reader.onerror = () => resolve('');
       reader.readAsArrayBuffer(file);
     });
   };
 
   const processFile = useCallback(async (file) => {
-    const allowed = /\.(pdf|txt|doc|docx|png|jpg|jpeg)$/i;
-    if (!allowed.test(file.name)) {
-      setErrorMsg('Unsupported file. Please upload PDF, DOCX, TXT, PNG, or JPG.');
+    // 1. Check if user uploaded an image file
+    const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|heic|ico)$/i.test(file.name) || (file.type && file.type.startsWith('image/'));
+    if (isImage) {
+      setErrorMsg('⚠️ Image files (PNG, JPG, etc.) cannot be processed as a resume. Please upload a valid Resume or CV document in PDF, DOCX, DOC, or TXT format.');
+      setUploadedFile(null);
+      setResumeText('');
+      setParsedResult(null);
       return;
     }
+
+    // 2. Strict check for supported document formats
+    const allowed = /\.(pdf|txt|doc|docx)$/i;
+    if (!allowed.test(file.name)) {
+      setErrorMsg('⚠️ Unsupported file format. Please upload a valid Resume/CV document (.PDF, .DOCX, .DOC, or .TXT).');
+      setUploadedFile(null);
+      setResumeText('');
+      setParsedResult(null);
+      return;
+    }
+
     setErrorMsg('');
     setUploadedFile(file);
     setParsedResult(null);
@@ -693,14 +713,25 @@ export default function ResumeScreeningView() {
       extracted = await new Promise((resolve) => {
         const r = new FileReader();
         r.onload = (e) => resolve(e.target.result || '');
+        r.onerror = () => resolve('');
         r.readAsText(file);
       });
     } else {
       extracted = await extractTextFromPdf(file);
     }
-    const finalTxt = `[Uploaded File: ${file.name}]\n${extracted}`;
+
+    const cleanExtracted = (extracted || '').trim();
+    if (!cleanExtracted || cleanExtracted.length < 20) {
+      setErrorMsg(`⚠️ Could not extract readable text from "${file.name}". If this is a scanned image/PDF without selectable text, please upload a text-based PDF, DOCX, or paste your credentials directly.`);
+      setUploadedFile(null);
+      setResumeText('');
+      setParsedResult(null);
+      return;
+    }
+
+    const finalTxt = `[Uploaded File: ${file.name}]\n${cleanExtracted}`;
     setResumeText(finalTxt);
-    // Auto analyze newly uploaded file
+    // Auto analyze newly uploaded valid resume
     executeParse(finalTxt);
   }, []);
 
@@ -834,7 +865,7 @@ export default function ResumeScreeningView() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".pdf,.txt,.doc,.docx,.png,.jpg,.jpeg"
+        accept=".pdf,.docx,.doc,.txt,.rtf"
         onChange={handleFileInput}
         className="hidden"
       />
@@ -949,8 +980,8 @@ export default function ResumeScreeningView() {
                 <FileText className="w-5 h-5 text-primary" />
                 <span>Upload Resume Document</span>
               </h2>
-              <span className="text-[11px] font-bold text-outline bg-surface-container-low px-2.5 py-1 rounded-full">
-                PDF / DOCX / TXT
+              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-full">
+                PDF / DOCX / TXT only
               </span>
             </div>
 
@@ -963,7 +994,7 @@ export default function ResumeScreeningView() {
                   <div className="min-w-0">
                     <div className="text-xs font-black text-emerald-950 truncate">{uploadedFile.name}</div>
                     <div className="text-[11px] text-emerald-700 font-medium">
-                      {(uploadedFile.size / 1024).toFixed(1)} KB • Extracted for AI parsing
+                      {(uploadedFile.size / 1024).toFixed(1)} KB • Verified CV Document
                     </div>
                   </div>
                 </div>
@@ -995,9 +1026,9 @@ export default function ResumeScreeningView() {
                 </div>
                 <div>
                   <div className="text-xs font-black text-text-main">
-                    {isDragging ? 'Drop resume document here!' : 'Drag & drop your Resume PDF / DOCX'}
+                    {isDragging ? 'Drop resume document here!' : 'Drag & drop your Resume PDF / DOCX / TXT'}
                   </div>
-                  <div className="text-[11px] text-outline font-medium">or click here to browse files on your device</div>
+                  <div className="text-[11px] text-outline font-medium">Click to browse CV documents (Images/photos not allowed)</div>
                 </div>
               </div>
             )}

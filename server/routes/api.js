@@ -1113,10 +1113,6 @@ function parseResumeContent(text) {
   Object.entries(NOS_SKILL_KEYWORD_MAP).forEach(([kw, skill]) => {
     if (lower.includes(kw)) extractedSkillsSet.add(skill);
   });
-  if (extractedSkillsSet.size === 0) {
-    extractedSkillsSet.add('Panchakarma Procedure Execution');
-    extractedSkillsSet.add('Patient Vital Signs Monitoring');
-  }
   const extractedSkills = Array.from(extractedSkillsSet);
 
   // Extract Certificates
@@ -1124,7 +1120,6 @@ function parseResumeContent(text) {
   Object.entries(CERT_KEYWORD_MAP).forEach(([kw, cert]) => {
     if (lower.includes(kw)) certsSet.add(cert);
   });
-  if (certsSet.size === 0) certsSet.add('HSSC Panchakarma Attendant (Verified)');
   const detectedCertificates = Array.from(certsSet);
 
   // All Standard NOS Skills Benchmark
@@ -1143,11 +1138,17 @@ function parseResumeContent(text) {
     { name: 'GCP & Clinical Trial Protocols', category: 'Clinical Research', weight: 15 }
   ];
 
+  const hasAnyMatch = extractedSkills.length > 0;
+
   // Calculate Skill Gap Breakdown
   const skillGaps = ALL_NOS_BENCHMARKS.map(bench => {
     const isMastered = extractedSkills.includes(bench.name);
     let status = isMastered ? 'Mastered' : 'Gap';
-    let proficiencyScore = isMastered ? Math.floor(82 + Math.random() * 14) : Math.floor(35 + Math.random() * 25);
+    let proficiencyScore = isMastered 
+      ? Math.floor(82 + Math.random() * 14) 
+      : hasAnyMatch 
+        ? Math.floor(30 + Math.random() * 30) 
+        : 0;
     let urgency = !isMastered ? (bench.weight >= 15 ? 'Critical' : 'Moderate') : 'None';
 
     return {
@@ -1163,7 +1164,9 @@ function parseResumeContent(text) {
 
   const masteredCount = skillGaps.filter(g => g.status === 'Mastered').length;
   const gapCount = skillGaps.filter(g => g.isGap).length;
-  const overallReadinessScore = Math.min(96, Math.max(58, Math.round(55 + (masteredCount / ALL_NOS_BENCHMARKS.length) * 40 + detectedCertificates.length * 3)));
+  const overallReadinessScore = !hasAnyMatch 
+    ? 0 
+    : Math.min(98, Math.max(25, Math.round((masteredCount / ALL_NOS_BENCHMARKS.length) * 80 + Math.min(18, detectedCertificates.length * 6))));
 
   // Role Mapping Engine: Calculate Match % for each AYUSH Career Role
   const roleMappings = AYUSH_CAREER_ROLES.map(role => {
@@ -1171,8 +1174,8 @@ function parseResumeContent(text) {
     const matchingSkills = role.requiredSkills.filter(req => extractedSkills.includes(req));
     const missingSkills = role.requiredSkills.filter(req => !extractedSkills.includes(req));
 
-    const matchPercent = Math.min(98, Math.max(42, Math.round((matchingSkills.length / totalRequired) * 100)));
-    const fitLevel = matchPercent >= 80 ? 'High Match' : matchPercent >= 60 ? 'Moderate Match' : 'Upskilling Needed';
+    const matchPercent = totalRequired > 0 ? Math.round((matchingSkills.length / totalRequired) * 100) : 0;
+    const fitLevel = matchPercent >= 75 ? 'High Match' : matchPercent >= 45 ? 'Moderate Match' : 'Upskilling Needed';
 
     return {
       ...role,
@@ -1248,12 +1251,13 @@ function parseResumeContent(text) {
 
 router.post('/ai/parse-resume', async (req, res) => {
   const { resumeText } = req.body;
-  if (!resumeText || !resumeText.trim()) {
-    return res.status(400).json({ success: false, message: 'Resume text or document content is required.' });
+  const clean = (resumeText || '').trim();
+  if (!clean || clean.length < 20) {
+    return res.status(400).json({ success: false, message: 'Valid resume document content (minimum 20 characters) is required.' });
   }
 
   try {
-    const analysis = parseResumeContent(resumeText);
+    const analysis = parseResumeContent(clean);
     res.json({
       success: true,
       extractedData: analysis,
