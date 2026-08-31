@@ -1249,11 +1249,44 @@ function parseResumeContent(text) {
   };
 }
 
+function isAuthenticResumeServer(text) {
+  if (!text || typeof text !== 'string') return false;
+  const clean = text.trim();
+  if (clean.length < 35) return false;
+
+  const patterns = [
+    /\b(resume|curriculum\s+vitae|\bcv\b|biodata|profile|summary)\b/i,
+    /\b(education|qualifications?|academics?|degree|diploma|bachelor|master|matriculation|hsc|ssc|cbse)\b/i,
+    /\b(experience|internship|intern|employment|work\s+history|clinical\s+posting|rotatory\s+internship)\b/i,
+    /\b(skills?|competenc(y|ies)|expertise|certificat(e|ion|ions)|verified)\b/i,
+    /\b(bams|bhms|bnys|bums|bsms|ayurveda|ayush|homeopathy|unani|siddha|naturopathy|dravyaguna|panchakarma)\b/i,
+    /\b(hospital|clinic|clinical|patient|doctor|dr\.|vaidya|practitioner|physician|consultant)\b/i,
+    /\b(university|institute|college|school|board|cgpa|percentage)\b/i,
+    /\b(contact|email|phone|mobile|address|declaration|hssc|nsqf)\b/i
+  ];
+
+  let matches = 0;
+  for (const p of patterns) {
+    if (p.test(clean)) matches++;
+  }
+
+  const lower = clean.toLowerCase();
+  let skillMatches = 0;
+  for (const kw of Object.keys(NOS_SKILL_KEYWORD_MAP)) {
+    if (lower.includes(kw)) skillMatches++;
+  }
+
+  return matches >= 2 || skillMatches >= 2;
+}
+
 router.post('/ai/parse-resume', async (req, res) => {
   const { resumeText } = req.body;
   const clean = (resumeText || '').trim();
-  if (!clean || clean.length < 20) {
-    return res.status(400).json({ success: false, message: 'Valid resume document content (minimum 20 characters) is required.' });
+  if (!clean || !isAuthenticResumeServer(clean)) {
+    return res.status(400).json({ 
+      success: false, 
+      message: 'Invalid Document: The provided content is not a recognized Resume or CV. Please upload a genuine CV containing qualifications, clinical skills, or experience.' 
+    });
   }
 
   try {

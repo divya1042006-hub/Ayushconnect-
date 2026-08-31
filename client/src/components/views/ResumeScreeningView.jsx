@@ -456,6 +456,37 @@ const CERT_KEYWORD_MAP = {
   'bsms': 'BSMS Degree (Siddha)'
 };
 
+export const RESUME_KEYWORD_PATTERNS = [
+  /\b(resume|curriculum\s+vitae|\bcv\b|biodata|profile|summary)\b/i,
+  /\b(education|qualifications?|academics?|degree|diploma|bachelor|master|matriculation|hsc|ssc|cbse)\b/i,
+  /\b(experience|internship|intern|employment|work\s+history|clinical\s+posting|rotatory\s+internship)\b/i,
+  /\b(skills?|competenc(y|ies)|expertise|certificat(e|ion|ions)|verified)\b/i,
+  /\b(bams|bhms|bnys|bums|bsms|ayurveda|ayush|homeopathy|unani|siddha|naturopathy|dravyaguna|panchakarma)\b/i,
+  /\b(hospital|clinic|clinical|patient|doctor|dr\.|vaidya|practitioner|physician|consultant)\b/i,
+  /\b(university|institute|college|school|board|cgpa|percentage)\b/i,
+  /\b(contact|email|phone|mobile|address|declaration|hssc|nsqf)\b/i
+];
+
+export function isAuthenticResume(rawText) {
+  if (!rawText || typeof rawText !== 'string') return false;
+  const clean = rawText.trim();
+  if (clean.length < 35) return false;
+  
+  let patternMatches = 0;
+  for (const pattern of RESUME_KEYWORD_PATTERNS) {
+    if (pattern.test(clean)) patternMatches++;
+  }
+
+  let skillMatches = 0;
+  const lower = clean.toLowerCase();
+  for (const kw of Object.keys(NOS_SKILL_KEYWORD_MAP)) {
+    if (lower.includes(kw)) skillMatches++;
+  }
+
+  // Must match at least 2 general resume category markers OR at least 2 AYUSH clinical skills
+  return patternMatches >= 2 || skillMatches >= 2;
+}
+
 function parseResumeLocally(text) {
   const clean = text || '';
   const lines = clean.split('\n').map(l => l.trim()).filter(Boolean);
@@ -666,6 +697,19 @@ export default function ResumeScreeningView() {
       reader.onload = (e) => {
         try {
           const bytes = new Uint8Array(e.target.result);
+          const textDecoder = new TextDecoder('latin1');
+          const fullStr = textDecoder.decode(bytes);
+
+          // Check if this PDF only contains image streams and no text operators
+          const hasTextOperators = /\b(BT|ET|Tj|TJ|ToUnicode|Font)\b/.test(fullStr);
+          const hasImageOnly = /\b(\/Image|\/DCTDecode|\/JPXDecode)\b/.test(fullStr) && !hasTextOperators;
+
+          if (hasImageOnly) {
+            // Scanned image or photo converted to PDF
+            resolve('');
+            return;
+          }
+
           let text = '';
           for (let i = 0; i < bytes.length; i++) {
             const b = bytes[i];
@@ -687,7 +731,7 @@ export default function ResumeScreeningView() {
     // 1. Check if user uploaded an image file
     const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|heic|ico)$/i.test(file.name) || (file.type && file.type.startsWith('image/'));
     if (isImage) {
-      setErrorMsg('⚠️ Image files (PNG, JPG, etc.) cannot be processed as a resume. Please upload a valid Resume or CV document in PDF, DOCX, DOC, or TXT format.');
+      setErrorMsg('❌ Image files (PNG, JPG, etc.) cannot be processed as a resume. Please upload a valid Resume or CV document in PDF, DOCX, DOC, or TXT format.');
       setUploadedFile(null);
       setResumeText('');
       setParsedResult(null);
@@ -697,7 +741,7 @@ export default function ResumeScreeningView() {
     // 2. Strict check for supported document formats
     const allowed = /\.(pdf|txt|doc|docx)$/i;
     if (!allowed.test(file.name)) {
-      setErrorMsg('⚠️ Unsupported file format. Please upload a valid Resume/CV document (.PDF, .DOCX, .DOC, or .TXT).');
+      setErrorMsg('❌ Unsupported file format. Please upload a valid Resume/CV document (.PDF, .DOCX, .DOC, or .TXT).');
       setUploadedFile(null);
       setResumeText('');
       setParsedResult(null);
@@ -721,8 +765,8 @@ export default function ResumeScreeningView() {
     }
 
     const cleanExtracted = (extracted || '').trim();
-    if (!cleanExtracted || cleanExtracted.length < 20) {
-      setErrorMsg(`⚠️ Could not extract readable text from "${file.name}". If this is a scanned image/PDF without selectable text, please upload a text-based PDF, DOCX, or paste your credentials directly.`);
+    if (!cleanExtracted || !isAuthenticResume(cleanExtracted)) {
+      setErrorMsg(`❌ Invalid Document: "${file.name}" is not a recognized Resume or CV. Scanned image PDFs, photos, or documents without clinical/educational qualifications are rejected. Please upload a real CV/Resume.`);
       setUploadedFile(null);
       setResumeText('');
       setParsedResult(null);
@@ -760,8 +804,17 @@ export default function ResumeScreeningView() {
     const text = textToParse !== undefined ? textToParse : resumeText;
     if (!text || !text.trim()) {
       setErrorMsg('Please upload a resume or paste text first.');
+      setParsedResult(null);
       return;
     }
+
+    if (!isAuthenticResume(text)) {
+      setErrorMsg('❌ The provided document or text is not a recognizable Resume/CV. It lacks educational qualifications (e.g. BAMS/BHMS), clinical competencies, or work experience. Please upload a genuine CV or pick a sample profile below.');
+      setParsedResult(null);
+      setParsing(false);
+      return;
+    }
+
     setParsing(true);
     setErrorMsg('');
     setSyncSuccessMsg('');

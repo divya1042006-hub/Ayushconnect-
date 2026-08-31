@@ -254,7 +254,7 @@ export default function SmartRecommendationsView({ user }) {
     // Reject image files explicitly
     const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|heic|ico)$/i.test(file.name) || (file.type && file.type.startsWith('image/'));
     if (isImage) {
-      showToast('⚠️ Image files cannot be parsed as resumes. Please upload a PDF, DOCX, DOC, or TXT CV.');
+      showToast('❌ Image files cannot be parsed as resumes. Please upload a PDF, DOCX, DOC, or TXT CV.');
       e.target.value = '';
       return;
     }
@@ -262,7 +262,7 @@ export default function SmartRecommendationsView({ user }) {
     // Strict document check
     const allowed = /\.(pdf|txt|doc|docx)$/i;
     if (!allowed.test(file.name)) {
-      showToast('⚠️ Unsupported file format. Please upload a valid Resume/CV (.PDF, .DOCX, .DOC, .TXT).');
+      showToast('❌ Unsupported format. Please upload a valid Resume/CV (.PDF, .DOCX, .DOC, .TXT).');
       e.target.value = '';
       return;
     }
@@ -278,21 +278,34 @@ export default function SmartRecommendationsView({ user }) {
         } else {
           try {
             const bytes = new Uint8Array(event.target.result);
-            for (let i = 0; i < bytes.length; i++) {
-              const b = bytes[i];
-              if (b > 31 && b < 127) text += String.fromCharCode(b);
-              else if (b === 10 || b === 13) text += '\n';
+            const textDecoder = new TextDecoder('latin1');
+            const fullStr = textDecoder.decode(bytes);
+
+            // If PDF is just an image stream
+            const hasTextOperators = /\b(BT|ET|Tj|TJ|ToUnicode|Font)\b/.test(fullStr);
+            const hasImageOnly = /\b(\/Image|\/DCTDecode|\/JPXDecode)\b/.test(fullStr) && !hasTextOperators;
+
+            if (hasImageOnly) {
+              text = '';
+            } else {
+              for (let i = 0; i < bytes.length; i++) {
+                const b = bytes[i];
+                if (b > 31 && b < 127) text += String.fromCharCode(b);
+                else if (b === 10 || b === 13) text += '\n';
+              }
+              const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3 && /[a-zA-Z]/.test(l));
+              text = lines.join('\n');
             }
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 3 && /[a-zA-Z]/.test(l));
-            text = lines.join('\n');
           } catch {
             text = '';
           }
         }
 
         const cleanText = (text || '').trim();
-        if (!cleanText || cleanText.length < 20) {
-          showToast(`⚠️ Could not extract readable text from "${file.name}". Please upload a valid text-based CV.`);
+        const resumeKeywordCheck = /\b(resume|cv|curriculum\s+vitae|education|qualification|experience|internship|skills|bams|bhms|bnys|bums|bsms|ayurveda|doctor|clinical|hospital|university)\b/i;
+        
+        if (!cleanText || cleanText.length < 35 || !resumeKeywordCheck.test(cleanText)) {
+          showToast(`❌ Invalid Document: "${file.name}" is not a recognized CV/Resume. Image PDFs and non-resume files are not supported.`);
           setIsUploadingResume(false);
           e.target.value = '';
           return;
