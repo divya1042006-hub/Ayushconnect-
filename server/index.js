@@ -30,6 +30,12 @@ app.get('/health', (req, res) => {
 // API Router
 app.use('/api', apiRouter);
 
+// Forward root /match-score directly to API router
+app.post('/match-score', (req, res, next) => {
+  req.url = '/match-score';
+  apiRouter(req, res, next);
+});
+
 app.listen(PORT, () => {
   console.log(`[AyushConnect Backend] Server running on http://localhost:${PORT}`);
 });

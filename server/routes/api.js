@@ -1,7 +1,14 @@
 import express from 'express';
 import fs from 'fs';
+import path from 'path';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
 import { mockDatabase } from '../data/mockDatabase.js';
 import { supabase } from '../supabaseClient.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const SCRIPT_PATH = path.resolve(__dirname, '../skill_matcher.py');
 
 const qualificationPacks = JSON.parse(
   fs.readFileSync(new URL('../data/qualificationPacks.json', import.meta.url), 'utf-8')
@@ -549,7 +556,154 @@ router.post('/recruiter/update-status', async (req, res) => {
   res.json({ success: true, application: app || { id: appId, stage: newStage, status: newStatus } });
 });
 
-// 6. AI Features (Match Explanation) API
+// 6. AI Features (Semantic Matching & Match Explanation) API
+router.post('/match-score', async (req, res) => {
+  const {
+    student_skills,
+    studentSkills,
+    required_skills,
+    requiredSkills,
+    listing_skills,
+    weights,
+    similarity_threshold,
+    similarityThreshold
+  } = req.body || {};
+
+  const candidateSkills = student_skills || studentSkills || [];
+  const listingSkills = required_skills || requiredSkills || listing_skills || [];
+  const threshold = similarity_threshold || similarityThreshold || 0.5;
+
+  if (!Array.isArray(candidateSkills)) {
+    return res.status(400).json({ success: false, error: 'student_skills must be an array of strings.' });
+  }
+  if (!Array.isArray(listingSkills)) {
+    return res.status(400).json({ success: false, error: 'required_skills must be an array.' });
+  }
+
+  // Execute SemanticSkillMatcher Python script
+  const payload = JSON.stringify({
+    student_skills: candidateSkills,
+    required_skills: listingSkills,
+    weights: weights,
+    similarity_threshold: threshold
+  });
+
+  try {
+    const pyProcess = spawn('python', [SCRIPT_PATH, payload], {
+      windowsHide: true,
+      cwd: path.resolve(__dirname, '..')
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    pyProcess.stdout.on('data', (data) => {
+      stdout += data.toString();
+    });
+
+    pyProcess.stderr.on('data', (data) => {
+      stderr += data.toString();
+    });
+
+    pyProcess.on('close', (code) => {
+      if (code === 0 && stdout.trim()) {
+        try {
+          const parsed = JSON.parse(stdout);
+          return res.json({ success: true, ...parsed });
+        } catch (parseErr) {
+          console.error('[Semantic Matcher JSON Parse Error]:', parseErr, stdout);
+        }
+      }
+
+      // Fallback matching algorithm if python execution encounters an issue
+      console.warn('[Semantic Matcher Fallback]:', stderr || 'Using in-memory matching fallback');
+      const reqNames = listingSkills.map((s, idx) => {
+        if (typeof s === 'object' && s !== null) {
+          return { name: s.skill || s.name || `Skill ${idx + 1}`, weight: s.weight || 1.0 };
+        }
+        const w = (weights && weights[idx]) ? weights[idx] : 1.0;
+        return { name: String(s), weight: w };
+      });
+
+      let totalWeight = 0;
+      let weightedScoreSum = 0;
+      const matchedList = [];
+      const missingList = [];
+      const breakdown = [];
+
+      reqNames.forEach(({ name, weight }) => {
+        totalWeight += weight;
+        const normReq = name.toLowerCase();
+        let bestSim = 0.0;
+        let bestMatchSkill = null;
+
+        candidateSkills.forEach(cSkill => {
+          const normCand = String(cSkill).toLowerCase();
+          let sim = 0.0;
+          if (normReq === normCand) {
+            sim = 1.0;
+          } else if (normReq.includes(normCand) || normCand.includes(normReq)) {
+            sim = 0.85;
+          } else {
+            const reqWords = normReq.split(/\s+/);
+            const candWords = normCand.split(/\s+/);
+            const common = reqWords.filter(w => w.length > 2 && candWords.includes(w));
+            if (common.length > 0) {
+              sim = Math.min(0.78, common.length / Math.max(reqWords.length, candWords.length) + 0.3);
+            }
+          }
+
+          if (sim > bestSim) {
+            bestSim = sim;
+            bestMatchSkill = cSkill;
+          }
+        });
+
+        const isMatched = bestSim >= threshold;
+        if (isMatched) {
+          matchedList.push(name);
+        } else {
+          missingList.push(name);
+        }
+
+        breakdown.push({
+          required_skill: name,
+          weight: Math.round(weight * 100) / 100,
+          best_matching_skill: bestMatchSkill,
+          similarity_score: Math.round(bestSim * 10000) / 10000,
+          is_matched: isMatched,
+          status: bestSim >= 0.75 ? 'high_fit' : (isMatched ? 'moderate_fit' : 'gap')
+        });
+
+        weightedScoreSum += bestSim * weight;
+      });
+
+      const rawScore = totalWeight > 0 ? (weightedScoreSum / totalWeight) : 0;
+      const matchPercentage = Math.round(rawScore * 10000) / 100;
+      const fitLevel = matchPercentage >= 75 ? 'High Fit' : (matchPercentage >= 50 ? 'Medium Fit' : 'Developing');
+
+      return res.json({
+        success: true,
+        match_percentage: matchPercentage,
+        match_score: Math.round(rawScore * 10000) / 10000,
+        fit_level: fitLevel,
+        matched_skills: matchedList,
+        missing_skills: missingList,
+        breakdown: breakdown,
+        student_skill_count: candidateSkills.length,
+        required_skill_count: reqNames.length
+      });
+    });
+
+    pyProcess.on('error', (err) => {
+      console.error('[Semantic Matcher Spawn Error]:', err);
+      res.status(500).json({ success: false, error: err.message });
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 router.post('/ai/explain-match', (req, res) => {
   const { candidateName, roleTitle, matchScore, matchedSkills, gapSkills } = req.body;
 

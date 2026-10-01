@@ -38,3 +38,20 @@ server/.env
 *.njsproj
 *.sln
 *.sw?
+
+# Python / ML artifacts
+__pycache__/
+*/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.venv*/
+venv/
+ENV/
+env/
+.pytest_cache/
+site-packages/
+*/site-packages/
+wheels/
+*/wheels/
+
