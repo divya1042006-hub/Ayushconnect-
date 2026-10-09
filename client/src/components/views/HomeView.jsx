@@ -65,10 +65,10 @@ export default function HomeView({ setActiveTab, setActiveRole }) {
           </p>
           <div className="pt-6 flex flex-wrap items-center gap-5">
             <button
-              onClick={() => { setActiveTab('roadmap'); setActiveRole('student'); }}
+              onClick={() => { setActiveTab('assessment'); setActiveRole('student'); }}
               className="px-8 py-4 rounded-2xl bg-leaf-green-accent text-primary font-extrabold text-sm hover:bg-white transition-all shadow-xl flex items-center gap-3 group scale-100 hover:scale-[1.02]"
             >
-              <span>Take Skill Gap Assessment</span>
+              <span>Take Skill Diagnostic Test (Supabase)</span>
               <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </button>
             <button
