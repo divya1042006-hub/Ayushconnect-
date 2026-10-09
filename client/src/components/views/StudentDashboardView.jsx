@@ -347,11 +347,11 @@ export default function StudentDashboardView({ user, setActiveTab }) {
             </div>
           </div>
           <button
-            onClick={() => setActiveTab('roadmap')}
+            onClick={() => setActiveTab('assessment')}
             className="px-5 py-2.5 rounded-2xl bg-leaf-green-accent text-primary font-extrabold hover:bg-white transition-all shadow-md text-xs flex items-center gap-2"
           >
             <Compass className="w-4 h-4" />
-            <span>Retake Skill Assessment</span>
+            <span>Take HSSC Diagnostic Test</span>
           </button>
         </div>
       </div>

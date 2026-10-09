@@ -7,6 +7,7 @@ import HomeView from './components/views/HomeView';
 import StudentDashboardView from './components/views/StudentDashboardView';
 import StudentRoadmapView from './components/views/StudentRoadmapView';
 import SmartRecommendationsView from './components/views/SmartRecommendationsView';
+import SkillAssessmentView from './components/views/SkillAssessmentView';
 import RecruiterDashboardView from './components/views/RecruiterDashboardView';
 import ResumeScreeningView from './components/views/ResumeScreeningView';
 import PlacementManagementView from './components/views/PlacementManagementView';
@@ -228,6 +229,13 @@ export default function App() {
         >
           {activeTab === 'home' && <HomeView setActiveTab={setActiveTab} setActiveRole={setActiveRole} />}
           {activeTab === 'student' && <StudentDashboardView user={user} setActiveTab={setActiveTab} />}
+          {activeTab === 'assessment' && (
+            <SkillAssessmentView 
+              user={user} 
+              onNavigateToRoadmap={() => setActiveTab('roadmap')} 
+              onNavigateToRecommendations={() => setActiveTab('recommendations')} 
+            />
+          )}
           {activeTab === 'roadmap' && <StudentRoadmapView user={user} setUser={setUser} />}
           {activeTab === 'recommendations' && <SmartRecommendationsView user={user} />}
           {activeTab === 'placement' && <PlacementManagementView />}

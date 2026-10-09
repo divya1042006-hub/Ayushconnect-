@@ -17,6 +17,7 @@ export default function Sidebar({
   const navTabs = [
     { id: 'home', label: 'Home Overview', icon: Home, role: 'student' },
     { id: 'student', label: 'Student Dashboard', icon: GraduationCap, role: 'student' },
+    { id: 'assessment', label: 'Skill Diagnostic Test', icon: Sparkles, role: 'student' },
     { id: 'roadmap', label: 'Skill Roadmap', icon: Compass, role: 'student' },
     { id: 'recommendations', label: 'AI Recommendations', icon: BrainCircuit, role: 'student' },
     { id: 'placement', label: 'Placement Hub', icon: Kanban, role: 'recruiter' },

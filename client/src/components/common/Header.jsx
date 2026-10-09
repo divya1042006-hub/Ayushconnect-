@@ -8,6 +8,7 @@ import {
 
 const GLOBAL_SEARCH_INDEX = [
   // Views / Navigation
+  { id: 'p0', title: 'AYUSH Competency & Skill Diagnostic Test', type: 'page', tab: 'assessment', role: 'student', desc: 'Take standardized HSSC Qualification Pack tests and generate Skill Gap Reports', category: 'Portals & Tools', keywords: 'test quiz exam assessment qualification pack nos gap skill question timer start-test submit-test' },
   { id: 'p1', title: 'AI Resume Screening & Career Matcher', type: 'page', tab: 'screening', role: 'student', desc: 'Upload resume to calculate HSSC skill gaps & apply to job openings', category: 'Portals & Tools', keywords: 'resume cv score match apply panchakarma percentage gap upload' },
   { id: 'p2', title: 'Smart Learning & Opportunity Hub', type: 'page', tab: 'recommendations', role: 'student', desc: 'AI courses, internships, and skill gap bridging recommendations', category: 'Portals & Tools', keywords: 'courses learning hub video youtube mcq quiz certificates bridge' },
   { id: 'p3', title: 'HSSC Skill Diagnostic & Roadmap', type: 'page', tab: 'roadmap', role: 'student', desc: 'Interactive skill tree, NOS benchmarks, and milestone progress', category: 'Portals & Tools', keywords: 'roadmap nos benchmarks standards skills level nsqf' },
@@ -122,6 +123,7 @@ export default function Header({
   const tabTitles = {
     home: 'Home Overview',
     student: 'Student & Intern Dashboard',
+    assessment: 'HSSC Skill Diagnostic Test & Assessment',
     roadmap: 'HSSC Skill Diagnostic & Roadmap',
     recommendations: 'AI Skill Gap & Career Recommendations',
     placement: 'Placement Management Pipeline',

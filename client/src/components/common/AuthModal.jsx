@@ -441,20 +441,29 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess, initialRole
       return;
     }
 
-    const resolvedUser = syncRes.user || baseUserCandidate;
-
-    // ── Best-effort Supabase Auth signUp / signIn ───────────────────────────
+    // ── Direct Supabase Auth signUp / signIn ───────────────────────────
     try {
       if (isRegisterMode) {
-        supabase.auth.signUp({ 
+        const { data: authData, error: authErr } = await supabase.auth.signUp({ 
           email: cleanEmail, 
           password: cleanPassword,
-          options: { data: { name: resolvedUser.name, role: targetRole } }
-        }).catch(() => {});
+          options: { data: { name: resolvedUser.name, role: targetRole, institution: formData.institution, degree: formData.degree } }
+        });
+        if (authData?.user?.id) {
+          resolvedUser.id = authData.user.id;
+        }
       } else {
-        supabase.auth.signInWithPassword({ email: cleanEmail, password: cleanPassword }).catch(() => {});
+        const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({ 
+          email: cleanEmail, 
+          password: cleanPassword 
+        });
+        if (authData?.user?.id) {
+          resolvedUser.id = authData.user.id;
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      console.warn('Supabase Auth warning:', e);
+    }
 
     setLoading(false);
     setSuccessMsg(
