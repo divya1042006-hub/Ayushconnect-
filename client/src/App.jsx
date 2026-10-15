@@ -141,7 +141,7 @@ export default function App() {
     }
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [authModalRole, setAuthModalRole] = useState('student');
 
@@ -218,9 +218,7 @@ export default function App() {
       {/* Main Content Canvas */}
       <main 
         onClick={() => !isSidebarCollapsed && setIsSidebarCollapsed(true)}
-        className={`flex-1 transition-all duration-300 ${
-          isSidebarCollapsed ? 'lg:ml-[80px]' : 'lg:ml-[260px]'
-        } w-full max-w-[1440px] px-6 sm:px-10 lg:px-12 py-8 md:py-12`}
+        className="flex-1 transition-all duration-300 lg:ml-[80px] w-full max-w-[1440px] px-6 sm:px-10 lg:px-12 py-8 md:py-12"
       >
         <ErrorBoundary 
           activeTab={activeTab} 

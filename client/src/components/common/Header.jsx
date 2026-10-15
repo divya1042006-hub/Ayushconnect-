@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Menu, Search, Bell, ShieldCheck, UserCheck, GraduationCap, Building2,
-  Briefcase, PanelLeftClose, PanelLeft, LogIn, LogOut, ChevronDown,
+  Briefcase, LogIn, LogOut, ChevronDown,
   CheckCircle2, Award, Briefcase as JobIcon, Sparkles, X, Check, User,
   BookOpen, Compass, Users, Globe, HelpCircle, ArrowRight, CornerDownLeft
 } from 'lucide-react';
@@ -158,35 +158,34 @@ export default function Header({
   };
 
   return (
-    <header className={`sticky top-0 z-30 bg-surface/90 backdrop-blur-md border-b border-surface-container-high transition-all duration-300 ${
-      isCollapsed ? 'lg:pl-[80px]' : 'lg:pl-[260px]'
-    }`}>
+    <header className="sticky top-0 z-30 bg-surface/90 backdrop-blur-md border-b border-surface-container-high transition-all duration-300 lg:pl-[80px]">
       <div className="max-w-[1440px] mx-auto px-6 sm:px-10 lg:px-12 h-20 flex items-center justify-between gap-4">
         {/* Left Side: Mobile Menu Button & Context Title */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button 
             onClick={() => setIsSidebarOpen(true)}
             className="lg:hidden p-2.5 rounded-2xl bg-surface-container-low border border-surface-container-high text-primary hover:bg-surface-container transition-colors"
+            title="Open Mobile Menu"
           >
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Desktop Collapse Toggle */}
-          <button 
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="hidden lg:flex p-2.5 rounded-2xl bg-surface-container-low border border-surface-container-high text-outline hover:text-primary hover:bg-surface-container transition-colors items-center gap-1.5 text-xs font-bold"
-            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-          >
-            {isCollapsed ? <PanelLeft className="w-4 h-4 text-primary" /> : <PanelLeftClose className="w-4 h-4" />}
-          </button>
-
-          <div className="hidden sm:block">
-            <div className="text-[11px] font-black uppercase tracking-wider text-outline">
-              AyushConnect Portal
+          {/* Logo Brand Icon */}
+          <div className="flex items-center gap-3">
+            <img 
+              src="/logo-ring.png" 
+              alt="AyushConnect Logo" 
+              className="w-14 h-14 rounded-full object-cover shadow-md shrink-0 hover:scale-105 transition-transform" 
+            />
+            <div className="hidden sm:block">
+              <div className="text-[11px] font-black uppercase tracking-wider text-outline flex items-center gap-1.5">
+                <span>AyushConnect Portal</span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-leaf-green-light text-primary font-bold">Official</span>
+              </div>
+              <h1 className="text-lg font-black text-text-main leading-tight font-manrope">
+                {tabTitles[activeTab] || 'Ayush Dashboard'}
+              </h1>
             </div>
-            <h1 className="text-lg font-black text-text-main leading-tight font-manrope">
-              {tabTitles[activeTab] || 'Ayush Dashboard'}
-            </h1>
           </div>
         </div>
 

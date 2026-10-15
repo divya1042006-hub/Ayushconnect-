@@ -1,5 +1,5 @@
 import React from 'react';
-import { Leaf, Home, GraduationCap, Compass, Briefcase, FileCheck, Award, Building2, ShieldCheck, X, Sparkles, ChevronLeft, ChevronRight, BrainCircuit, Kanban, Handshake, HelpCircle, LogOut, LogIn } from 'lucide-react';
+import { Leaf, Home, GraduationCap, Compass, Briefcase, FileCheck, Award, Building2, ShieldCheck, X, Sparkles, BrainCircuit, Kanban, Handshake, HelpCircle, LogOut, LogIn } from 'lucide-react';
 
 export default function Sidebar({ 
   activeTab, 
@@ -10,9 +10,9 @@ export default function Sidebar({
   setIsOpen, 
   isCollapsed, 
   setIsCollapsed, 
-  user,
-  onLogout,
-  onOpenAuth
+  user, 
+  onLogout, 
+  onOpenAuth 
 }) {
   const navTabs = [
     { id: 'home', label: 'Home Overview', icon: Home, role: 'student' },
@@ -38,15 +38,15 @@ export default function Sidebar({
     if (setIsOpen) setIsOpen(false);
   };
 
-  const handleSidebarClick = () => {
-    // Toggle sidebar if clicking container
+  const handleMouseEnter = () => {
+    // When cursor goes there, navbar comes out
     if (isCollapsed) {
       setIsCollapsed(false);
     }
   };
 
   const handleMouseLeave = () => {
-    // Auto-collapse when mouse leaves the sidebar area
+    // When cursor is removed, only symbols show
     if (!isCollapsed) {
       setIsCollapsed(true);
     }
@@ -62,19 +62,19 @@ export default function Sidebar({
         ></div>
       )}
 
-      {/* Collapsible Left Sidebar (260px expanded, 80px collapsed) */}
+      {/* Collapsible Left Sidebar (260px expanded on hover, 80px collapsed) */}
       <aside 
-        onClick={handleSidebarClick}
+        onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
-        className={`fixed top-0 left-0 bottom-0 z-50 bg-surface-white border-r border-surface-container-high flex flex-col justify-between transition-all duration-300 shadow-wellness cursor-pointer lg:cursor-auto ${
-          isCollapsed ? 'lg:w-[80px]' : 'lg:w-[260px]'
-        } w-[260px] ${
+        className={`fixed top-0 left-0 bottom-0 z-50 bg-white border-r border-surface-container-high flex flex-col justify-between transition-all duration-300 shadow-wellness lg:cursor-auto ${
+          isCollapsed ? 'lg:w-[80px]' : 'lg:w-[270px] shadow-2xl'
+        } w-[270px] ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
         <div className="flex flex-col h-full">
-          {/* Sidebar Top: Logo & Collapse Button */}
-          <div className={`p-5 border-b border-surface-container-high flex items-center justify-between ${isCollapsed ? 'lg:px-3 lg:justify-center' : ''}`}>
+          {/* Sidebar Top: Logo & Branding */}
+          <div className={`py-4 px-3 border-b border-surface-container-high flex items-center justify-between ${isCollapsed ? 'lg:justify-center' : ''}`}>
             <div 
               onClick={(e) => { 
                 e.stopPropagation(); 
@@ -83,37 +83,32 @@ export default function Sidebar({
                 setIsCollapsed(true);
               }}
               className="flex items-center gap-3 cursor-pointer group shrink-0"
+              title="AyushConnect Home"
             >
-              <div className="w-10 h-10 rounded-2xl bg-primary text-white flex items-center justify-center shadow-wellness group-hover:scale-105 transition-transform shrink-0">
-                <Leaf className="w-6 h-6 text-leaf-green-light" />
-              </div>
+              {/* Logo — only the clean round badge, no extra border/wrapper */}
+              <img
+                src="/logo-ring.png"
+                alt="AyushConnect Logo"
+                className={`rounded-full object-cover shadow-md group-hover:scale-105 transition-transform shrink-0 ${
+                  isCollapsed ? 'lg:w-14 lg:h-14 w-14 h-14' : 'w-14 h-14'
+                }`}
+              />
               {!isCollapsed && (
-                <div className="hidden lg:block">
-                  <span className="font-black text-xl tracking-tight text-primary font-manrope block leading-tight">AyushConnect</span>
-                  <span className="text-[10px] text-outline font-medium block">Side Menu</span>
+                <div className="hidden lg:block animate-in fade-in duration-200 min-w-0">
+                  <span className="font-black text-base tracking-tight text-primary font-manrope block leading-tight">AyushConnect</span>
+                  <span className="text-[10px] text-outline font-semibold block truncate">Integrating Wellness, Connecting Lives</span>
                 </div>
               )}
             </div>
 
-            {/* Collapse/Expand Toggle Button on Desktop */}
-            <button 
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsCollapsed(!isCollapsed);
-              }}
-              className="p-2 rounded-xl hover:bg-leaf-green-light hover:text-primary text-outline hidden lg:flex items-center justify-center transition-all"
-              title={isCollapsed ? "Expand Sidebar (260px)" : "Collapse Sidebar (Full Screen View)"}
-            >
-              {isCollapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
-            </button>
-
-            {/* Close Button on Mobile */}
+            {/* Close Button on Mobile Only */}
             <button 
               onClick={(e) => {
                 e.stopPropagation();
                 setIsOpen(false);
               }}
               className="p-2 rounded-xl hover:bg-surface-container-low text-outline lg:hidden"
+              title="Close Menu"
             >
               <X className="w-5 h-5" />
             </button>
