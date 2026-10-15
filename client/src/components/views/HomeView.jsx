@@ -49,12 +49,12 @@ export default function HomeView({ setActiveTab, setActiveRole }) {
     <div className="space-y-10 md:space-y-12 pb-16 font-manrope">
       {/* Hero Banner */}
       <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-primary via-primary-container to-tertiary text-white p-10 md:p-14 shadow-wellness">
-        <div className="absolute -right-8 -bottom-8 opacity-20 pointer-events-none">
-          <img src="/logo-ring.png" alt="" className="w-[420px] h-[420px] rounded-full object-cover mix-blend-screen" />
+        <div className="absolute -right-12 -bottom-12 opacity-10 pointer-events-none">
+          <Leaf className="w-[450px] h-[450px] text-white" />
         </div>
         <div className="max-w-4xl space-y-6 relative z-10">
           <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-leaf-green-light/20 text-leaf-green-light border border-leaf-green-accent/30 text-xs font-bold backdrop-blur-md">
-            <img src="/logo-symbol.png" alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+            <Sparkles className="w-4 h-4" />
             <span>National Platform for Ayush</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-black tracking-tight leading-[1.15] font-manrope">
